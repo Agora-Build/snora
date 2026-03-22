@@ -56,7 +56,7 @@ The Worker Manager communicates with each engine process via a Unix domain socke
 
 | Type | Direction | Description |
 |------|-----------|-------------|
-| `init` | Manager → Engine | Initial session config (agora credentials, preferences, initial state) |
+| `init` | Manager → Engine | Initial session config (agora app_id/token/channel, preferences, initial state) |
 | `state_update` | Manager → Engine | New physiological state from client |
 | `shutdown` | Manager → Engine | Graceful stop request |
 | `ack` | Engine → Manager | Acknowledgement of received message |
@@ -82,6 +82,7 @@ The Worker Manager communicates with each engine process via a Unix domain socke
 | `POST` | `/sessions` | Create a new sleep session job | `202 { job_id, status: "pending" }` |
 | `GET` | `/sessions/:id` | Get job status and metadata | `200 { job_id, status, ... }` |
 | `PUT` | `/sessions/:id/state` | Push physiological state update | `200 { ok: true }` |
+| `PUT` | `/sessions/:id/token` | Renew Agora token for a running session | `200 { ok: true }` |
 | `DELETE` | `/sessions/:id` | Stop a session gracefully | `200 { status: "stopping" }` |
 | `GET` | `/health` | Health check | `200 { ok: true }` |
 
@@ -131,6 +132,7 @@ The Worker Manager communicates with each engine process via a Unix domain socke
 | `hrv` | integer | 5-300 ms (RMSSD) | Yes |
 | `respiration_rate` | float | 4-40 breaths/min | Yes |
 | `stress_level` | float | 0.0-1.0 | Yes |
+| `timestamp` | integer | Unix epoch seconds | Optional (server uses current time if omitted) |
 | `soundscape` | string | Must match a key in manifest.json | Yes (in preferences) |
 | `volume` | float | 0.0-1.0 | Yes (in preferences) |
 
@@ -167,7 +169,7 @@ Runs as a **separate Node.js process** from the API. This ensures the API stays 
 - **Spawn** a C++ CUDA engine process per job, passing config via command-line args or Unix socket handshake
 - **Bridge state updates**: subscribe to Redis `snora:channel:state:{id}`, forward to the engine process via Unix socket
 - **Monitor child processes**: detect crashes via exit event, update job status to `failed`
-- **Heartbeat**: periodically set `snora:worker:{pid}` with TTL in Redis
+- **Heartbeat**: set `snora:worker:{pid}` with 10s TTL in Redis every 5 seconds
 - **Enforce limits**: cap concurrent sessions per container based on GPU memory (`MAX_CONCURRENT_SESSIONS` env var)
 - **Session limits**: max session duration of 12 hours (auto-stop). Idle timeout of 30 minutes (no state updates received → auto-stop). Both configurable via env vars `MAX_SESSION_DURATION_HOURS` and `IDLE_TIMEOUT_MINUTES`.
 
