@@ -31,12 +31,13 @@ COPY --from=engine-builder /usr/local/bin/snora-engine /usr/local/bin/snora-engi
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 COPY src/ ./src/
 COPY tsconfig.json ./
 
-RUN npx tsc
+# Build TypeScript then remove devDependencies to keep image small
+RUN npx tsc && npm prune --omit=dev
 
 COPY docker/start.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh
