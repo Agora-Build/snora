@@ -32,6 +32,8 @@ set(ENGINE_SOURCES
   src/audio/binaural.cpp
   src/audio/procedural.cpp
   src/audio/mixer.cpp
+  src/audio/pipeline.cpp
+  src/agora/agora_sender.cpp
   src/ipc/message.cpp
   src/ipc/socket_server.cpp
   src/state/session_state.cpp
@@ -51,6 +53,10 @@ if(NOT SNORA_CPU_MODE)
   target_link_libraries(snora-engine-lib PUBLIC CUDA::curand)
 endif()
 
+# Main engine executable
+add_executable(snora-engine src/main.cpp)
+target_link_libraries(snora-engine PRIVATE snora-engine-lib)
+
 # Tests
 if(SNORA_BUILD_TESTS)
   FetchContent_Declare(googletest GIT_REPOSITORY https://github.com/google/googletest.git GIT_TAG v1.15.2 GIT_SHALLOW TRUE)
@@ -67,6 +73,7 @@ if(SNORA_BUILD_TESTS)
     tests/test_binaural.cpp
     tests/test_procedural.cpp
     tests/test_mixer.cpp
+    tests/test_pipeline.cpp
   )
   target_link_libraries(snora-engine-tests PRIVATE snora-engine-lib GTest::gtest_main)
   include(GoogleTest)
