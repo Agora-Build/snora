@@ -1,0 +1,27 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+
+  snora:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - SNORA_API_KEY=dev-api-key
+      - REDIS_URL=redis://redis:6379
+      - AGORA_APP_ID=dev-agora-app-id
+      - ASSETS_PATH=/assets/sounds
+      - MAX_CONCURRENT_SESSIONS=4
+      - LOG_LEVEL=debug
+    depends_on:
+      - redis
+
+volumes:
+  redis-data:

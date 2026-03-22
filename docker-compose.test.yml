@@ -1,0 +1,36 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+
+  snora:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    environment:
+      - SNORA_API_KEY=test-api-key
+      - REDIS_URL=redis://redis:6379
+      - AGORA_APP_ID=test-agora-app-id
+      - ASSETS_PATH=/assets/sounds
+      - MAX_CONCURRENT_SESSIONS=2
+      - LOG_LEVEL=info
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    entrypoint: ["node", "--test"]
+    command: ["dist/tests/integration/session-lifecycle.test.js"]
+    environment:
+      - SNORA_API_URL=http://snora:8080
+      - SNORA_API_KEY=test-api-key
+    depends_on:
+      snora:
+        condition: service_healthy
