@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type Redis from 'ioredis';
+import type { Redis } from 'ioredis';
 import type { Logger } from 'pino';
 import { EngineBridge } from './engine-bridge.js';
 import { Heartbeat } from './heartbeat.js';
@@ -107,7 +107,7 @@ export class WorkerManager {
   private async recoverOrphanedJobs(): Promise<void> {
     const keys = await this.redis.keys('snora:job:*');
     // Filter out state sub-keys
-    const jobKeys = keys.filter((k) => !k.includes(':state'));
+    const jobKeys = keys.filter((k: string) => !k.includes(':state'));
 
     for (const key of jobKeys) {
       const data = await this.redis.hgetall(key);
@@ -141,7 +141,7 @@ export class WorkerManager {
 
     // Scan for pending jobs
     const keys = await this.redis.keys('snora:job:*');
-    const jobKeys = keys.filter((k) => !k.includes(':state'));
+    const jobKeys = keys.filter((k: string) => !k.includes(':state'));
 
     for (const key of jobKeys) {
       if (!this.canAcceptSession() || this.shuttingDown) break;

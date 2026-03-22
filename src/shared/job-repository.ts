@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type Redis from 'ioredis';
+import type { Redis } from 'ioredis';
 import type { Job, JobStatus } from './types.js';
 
 const TERMINAL_STATUSES: JobStatus[] = ['stopped', 'failed', 'client_disconnected'];

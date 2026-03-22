@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import rateLimit from '@fastify/rate-limit';
 import type { Config } from '../shared/config.js';
 import type { Logger } from 'pino';
-import type Redis from 'ioredis';
+import type { Redis } from 'ioredis';
 import type { JobRepository } from '../shared/job-repository.js';
 import { authPlugin } from './plugins/auth.js';
 import { sessionRoutes } from './routes/sessions.js';

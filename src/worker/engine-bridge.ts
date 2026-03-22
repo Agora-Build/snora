@@ -25,7 +25,7 @@ export class EngineBridge extends EventEmitter {
         reject(err);
       });
       this.socket.on('close', () => this.emit('close'));
-      this.socket.on('data', (data) => this.decoder.feed(data));
+      this.socket.on('data', (data: Buffer) => this.decoder.feed(data));
 
       this.decoder.on('message', (msg: IpcMessage) => {
         if (msg.type === 'ack' && this.pendingAck) {

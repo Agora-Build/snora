@@ -1,4 +1,4 @@
-import type Redis from 'ioredis';
+import type { Redis } from 'ioredis';
 
 const HEARTBEAT_INTERVAL = 5000;
 const HEARTBEAT_TTL = 10;

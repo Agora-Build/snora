@@ -1,4 +1,4 @@
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { loadConfig } from '../shared/config.js';
 import { createLogger } from '../shared/logger.js';
 import { JobRepository } from '../shared/job-repository.js';
@@ -15,7 +15,7 @@ async function main(): Promise<void> {
     enableReadyCheck: true,
   });
 
-  redis.on('error', (err) => {
+  redis.on('error', (err: Error) => {
     logger.error({ err }, 'Redis connection error');
   });
 
