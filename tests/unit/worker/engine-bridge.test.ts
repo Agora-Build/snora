@@ -1,11 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { createServer, type Server } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { EngineBridge } from '../../../src/worker/engine-bridge.js';
 import { encodeMessage, MessageDecoder } from '../../../src/shared/ipc-protocol.js';
-import type { IpcMessage } from '../../../src/shared/types.js';
 
 describe('EngineBridge', () => {
   let socketPath: string;

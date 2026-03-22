@@ -6,3 +6,4 @@ docs
 dist
 *.md
 .claude
+engine/build

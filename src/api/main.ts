@@ -10,7 +10,7 @@ async function main() {
   const redis = createRedisClient(config.redisUrl, logger);
   const jobRepo = new JobRepository(redis);
 
-  let activeCount = 0;
+  const activeCount = 0;
 
   const server = await buildServer({
     config, logger, redis, jobRepo,
