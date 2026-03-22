@@ -1,9 +1,10 @@
 # =============================================================================
-# Stage 1: Build C++ engine
+# Production Dockerfile with CUDA support
+# Requires: NVIDIA Container Toolkit + GPU host
 # =============================================================================
-FROM ubuntu:22.04 AS engine-builder
 
-ARG SNORA_CPU_MODE=ON
+# Stage 1: Build C++ CUDA engine
+FROM nvidia/cuda:12.6.3-devel-ubuntu22.04 AS engine-builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake \
@@ -17,15 +18,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY engine/ /build/engine/
 WORKDIR /build/engine
 RUN cmake -B build -DCMAKE_BUILD_TYPE=Release \
-    -DSNORA_CPU_MODE=${SNORA_CPU_MODE} \
+    -DSNORA_CPU_MODE=OFF \
     -DSNORA_USE_AGORA=OFF \
     -DSNORA_BUILD_TESTS=OFF \
     && cmake --build build --target snora-engine
 
-# =============================================================================
 # Stage 2: Runtime
-# =============================================================================
-FROM ubuntu:22.04
+FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tini \
@@ -48,7 +47,6 @@ RUN npm ci
 COPY src/ ./src/
 COPY tsconfig.json ./
 
-# Build TypeScript then remove devDependencies to keep image small
 RUN npx tsc && npm prune --omit=dev
 
 COPY docker/start.sh /usr/local/bin/start.sh
