@@ -1,0 +1,17 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "snora.fullname" . }}
+  labels:
+    {{- include "snora.labels" . | nindent 4 }}
+spec:
+  {{- if gt (int .Values.replicaCount) 1 }}
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  {{- else }}
+  maxUnavailable: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "snora.selectorLabels" . | nindent 6 }}
+{{- end }}
