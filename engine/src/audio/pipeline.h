@@ -7,6 +7,7 @@
 #include "audio/amplitude_mod.h"
 #include "audio/binaural.h"
 #include "audio/procedural.h"
+#include "audio/nature_player.h"
 #include "audio/mixer.h"
 #include "state/session_state.h"
 
@@ -36,6 +37,7 @@ class AudioPipeline {
   ProceduralTexture rain_;
   ProceduralTexture wind_;
   ProceduralTexture ocean_;
+  NaturePlayer     nature_player_;
   Mixer            mixer_;
 
   // Parameter smoothers (time constants from spec)

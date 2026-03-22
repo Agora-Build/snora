@@ -6,11 +6,14 @@ FROM nvidia/cuda:12.6.3-devel-ubuntu22.04 AS engine-builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake \
     build-essential \
+    pkg-config \
+    libsndfile1-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Placeholder: when engine/ exists, copy and build here
-RUN echo '#!/bin/bash\necho "snora-engine stub - not yet implemented"\nsleep infinity' > /usr/local/bin/snora-engine \
-    && chmod +x /usr/local/bin/snora-engine
+COPY engine/ /build/engine/
+WORKDIR /build/engine
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DSNORA_CPU_MODE=OFF -DSNORA_USE_AGORA=OFF -DSNORA_BUILD_TESTS=OFF \
+    && cmake --build build --target snora-engine
 
 # =============================================================================
 # Stage 2: Runtime
@@ -20,13 +23,14 @@ FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tini \
     curl \
+    libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=engine-builder /usr/local/bin/snora-engine /usr/local/bin/snora-engine
+COPY --from=engine-builder /build/engine/build/snora-engine /usr/local/bin/snora-engine
 
 WORKDIR /app
 

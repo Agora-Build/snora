@@ -32,6 +32,7 @@ set(ENGINE_SOURCES
   src/audio/binaural.cpp
   src/audio/procedural.cpp
   src/audio/mixer.cpp
+  src/audio/nature_player.cpp
   src/audio/pipeline.cpp
   src/agora/agora_sender.cpp
   src/ipc/message.cpp
@@ -73,6 +74,7 @@ if(SNORA_BUILD_TESTS)
     tests/test_binaural.cpp
     tests/test_procedural.cpp
     tests/test_mixer.cpp
+    tests/test_nature_player.cpp
     tests/test_pipeline.cpp
   )
   target_link_libraries(snora-engine-tests PRIVATE snora-engine-lib GTest::gtest_main)

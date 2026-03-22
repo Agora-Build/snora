@@ -26,6 +26,11 @@ bool AudioPipeline::init(const SessionConfig& config) {
   nature_smoother_.setImmediate(0.4f);
   volume_smoother_.setImmediate(config.volume);
 
+  // Load nature sounds (non-fatal if assets unavailable)
+  if (!config.assets_path.empty()) {
+    nature_player_.load(config.assets_path, config.soundscape);
+  }
+
   return true;
 }
 
@@ -43,7 +48,7 @@ void AudioPipeline::processFrame(int16_t* output, const AudioParams& params) {
   float slope   = slope_smoother_.smooth();
   float am_freq = am_smoother_.smooth();
   float bin_hz  = binaural_smoother_.smooth();
-  /* float nature_gain = */ nature_smoother_.smooth();  // reserved for future use
+  float nature_gain = nature_smoother_.smooth();
   float master_vol = volume_smoother_.smooth();
 
   // ------------------------------------------------------------------ //
@@ -73,8 +78,13 @@ void AudioPipeline::processFrame(int16_t* output, const AudioParams& params) {
   }
 
   // ------------------------------------------------------------------ //
-  // Step 7: nature player — skipped (libsndfile not available)
+  // Step 7: nature player (WAV loops from asset files)
   // ------------------------------------------------------------------ //
+  static int16_t nature_buf[FRAME_SAMPLES];
+  std::memset(nature_buf, 0, sizeof(nature_buf));
+  if (nature_player_.isLoaded()) {
+    nature_player_.render(nature_buf, nature_gain);
+  }
 
   // ------------------------------------------------------------------ //
   // Step 8: procedural texture based on soundscape selection
@@ -98,6 +108,7 @@ void AudioPipeline::processFrame(int16_t* output, const AudioParams& params) {
           {noise_buf,    0.6f},
           {binaural_buf, 0.4f},
           {proc_buf,     0.4f},
+          {nature_buf,   0.5f},
       },
       output, FRAME_SAMPLES, master_vol);
 }
