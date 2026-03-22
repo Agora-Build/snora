@@ -1,0 +1,54 @@
+name: GPU Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag to test"
+        required: false
+        default: "latest"
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  gpu-smoke-test:
+    name: GPU Integration Test
+    runs-on: [self-hosted, gpu]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+      - name: Run smoke test
+        run: |
+          docker compose -f docker-compose.yml up -d redis
+          sleep 2
+
+          docker run --rm --gpus all \
+            --network host \
+            -e SNORA_API_KEY=gpu-test-key \
+            -e REDIS_URL=redis://localhost:6379 \
+            -e AGORA_APP_ID=gpu-test-app \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }} &
+
+          sleep 5
+
+          curl -sf http://localhost:8080/health | jq .
+          curl -sf -X POST http://localhost:8080/sessions \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: gpu-test-key" \
+            -d '{"user_id":"gpu-test","agora":{"token":"t","channel":"c"},"initial_state":{"mood":"calm","heart_rate":70,"hrv":50,"respiration_rate":14,"stress_level":0.3},"preferences":{"soundscape":"rain","volume":0.7}}' \
+            | jq .
+
+          echo "GPU smoke test passed"
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -f docker-compose.yml down -v
