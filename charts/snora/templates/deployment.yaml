@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "snora.fullname" . }}
+  labels:
+    {{- include "snora.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "snora.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "snora.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.config.port }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.config.port | quote }}
+            - name: REDIS_URL
+              value: {{ .Values.redis.url | quote }}
+            - name: AGORA_APP_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "snora.fullname" . }}
+                  key: agora-app-id
+            - name: SNORA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "snora.fullname" . }}
+                  key: api-key
+            - name: ASSETS_PATH
+              value: {{ .Values.config.assetsPath | quote }}
+            - name: MAX_CONCURRENT_SESSIONS
+              value: {{ .Values.config.maxConcurrentSessions | quote }}
+            - name: GPU_DEVICE_ID
+              value: {{ .Values.config.gpuDeviceId | quote }}
+            - name: MAX_SESSION_DURATION_HOURS
+              value: {{ .Values.config.maxSessionDurationHours | quote }}
+            - name: IDLE_TIMEOUT_MINUTES
+              value: {{ .Values.config.idleTimeoutMinutes | quote }}
+            - name: CLIENT_DISCONNECT_GRACE_MINUTES
+              value: {{ .Values.config.clientDisconnectGraceMinutes | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: sound-assets
+              mountPath: {{ .Values.config.assetsPath }}
+      volumes:
+        - name: sound-assets
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
