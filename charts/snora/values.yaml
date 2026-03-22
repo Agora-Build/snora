@@ -1,0 +1,65 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/aerojet/snora
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: snora.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    nvidia.com/gpu: 1
+    memory: 8Gi
+  requests:
+    memory: 4Gi
+    cpu: 500m
+
+config:
+  maxConcurrentSessions: 4
+  port: 8080
+  assetsPath: /assets/sounds
+  gpuDeviceId: 0
+  maxSessionDurationHours: 12
+  idleTimeoutMinutes: 30
+  clientDisconnectGraceMinutes: 5
+  logLevel: info
+  agoraAppId: ""
+
+secrets:
+  apiKey: ""
+  redisPassword: ""
+
+redis:
+  url: redis://redis:6379
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetSessionsPerPod: 3
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+terminationGracePeriodSeconds: 45
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

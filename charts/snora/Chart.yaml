@@ -1,0 +1,13 @@
+apiVersion: v2
+name: snora
+description: Adaptive sleep audio service with GPU-powered real-time sound generation
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - audio
+  - sleep
+  - gpu
+  - agora
+maintainers:
+  - name: Snora Team
