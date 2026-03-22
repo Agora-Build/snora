@@ -26,6 +26,8 @@ endif()
 # Collect sources incrementally — add files as they are created
 set(ENGINE_SOURCES
   src/audio/param_smoother.cpp
+  src/ipc/message.cpp
+  src/ipc/socket_server.cpp
 )
 
 add_library(snora-engine-lib STATIC ${ENGINE_SOURCES})
@@ -49,6 +51,7 @@ if(SNORA_BUILD_TESTS)
 
   add_executable(snora-engine-tests
     tests/test_param_smoother.cpp
+    tests/test_message.cpp
   )
   target_link_libraries(snora-engine-tests PRIVATE snora-engine-lib GTest::gtest_main)
   include(GoogleTest)
