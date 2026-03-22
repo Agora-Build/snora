@@ -27,6 +27,11 @@ endif()
 set(ENGINE_SOURCES
   src/audio/param_smoother.cpp
   src/audio/noise_gen.cpp
+  src/audio/spectral_tilt.cpp
+  src/audio/amplitude_mod.cpp
+  src/audio/binaural.cpp
+  src/audio/procedural.cpp
+  src/audio/mixer.cpp
   src/ipc/message.cpp
   src/ipc/socket_server.cpp
   src/state/session_state.cpp
@@ -57,6 +62,11 @@ if(SNORA_BUILD_TESTS)
     tests/test_message.cpp
     tests/test_param_mapper.cpp
     tests/test_noise_gen.cpp
+    tests/test_spectral_tilt.cpp
+    tests/test_amplitude_mod.cpp
+    tests/test_binaural.cpp
+    tests/test_procedural.cpp
+    tests/test_mixer.cpp
   )
   target_link_libraries(snora-engine-tests PRIVATE snora-engine-lib GTest::gtest_main)
   include(GoogleTest)
