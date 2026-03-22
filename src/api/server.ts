@@ -19,7 +19,7 @@ interface BuildServerOptions {
 
 export async function buildServer(opts: BuildServerOptions) {
   const app = Fastify({
-    logger: opts.logger,
+    loggerInstance: opts.logger,
     bodyLimit: 4096,
   });
 
