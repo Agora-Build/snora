@@ -44,7 +44,30 @@ The system targets users with sleep difficulties, generating comfortable audio t
 - **Multi-session per container**: One container handles multiple concurrent users for efficient GPU utilization
 - **Job-based architecture**: HTTP API accepts requests and creates jobs in Redis; worker processes execute them independently. The system remains stable even if an audio engine process crashes.
 - **Node.js + C++ separation**: Node.js handles HTTP API and job orchestration via IPC (Unix socket). C++ CUDA engine handles audio generation and Agora streaming as a separate process. Process isolation means a crash in one doesn't take down the other.
-- **Redis for job store + pub/sub**: Persistent job state survives process crashes. Pub/sub enables real-time state update delivery.
+- **Redis for job store + pub/sub**: Persistent job state survives process crashes. Pub/sub enables real-time state update delivery. Redis should be configured with AOF persistence (`appendonly yes`) to survive Redis restarts.
+
+### IPC Protocol (Unix Socket)
+
+The Worker Manager communicates with each engine process via a Unix domain socket at `/tmp/snora-engine-{job_id}.sock`.
+
+**Message framing**: Length-prefixed JSON. Each message is a 4-byte big-endian uint32 (payload length) followed by a UTF-8 JSON payload.
+
+**Message types**:
+
+| Type | Direction | Description |
+|------|-----------|-------------|
+| `init` | Manager → Engine | Initial session config (agora credentials, preferences, initial state) |
+| `state_update` | Manager → Engine | New physiological state from client |
+| `shutdown` | Manager → Engine | Graceful stop request |
+| `ack` | Engine → Manager | Acknowledgement of received message |
+| `status` | Engine → Manager | Engine status report (running, error) |
+
+**Example message**:
+```json
+{"type": "state_update", "data": {"heart_rate": 68, "mood": "calm", "stress_level": 0.3, ...}}
+```
+
+**Timeout**: If the engine does not send an `ack` within 5 seconds, the Worker Manager considers it unresponsive and marks the job as `failed`.
 
 ## Component 1: Node.js HTTP API
 
@@ -68,7 +91,6 @@ The system targets users with sleep difficulties, generating comfortable audio t
 {
   "user_id": "12345",
   "agora": {
-    "app_id": "xxx",
     "token": "xxx",
     "channel": "sleep_12345"
   },
@@ -91,7 +113,6 @@ The system targets users with sleep difficulties, generating comfortable audio t
 
 ```json
 {
-  "user_id": "12345",
   "timestamp": 1710000000,
   "mood": "anxious",
   "heart_rate": 82,
@@ -100,6 +121,20 @@ The system targets users with sleep difficulties, generating comfortable audio t
   "stress_level": 0.7
 }
 ```
+
+### Input Validation Rules
+
+| Field | Type | Range | Required |
+|-------|------|-------|----------|
+| `mood` | string enum | `"anxious"`, `"stressed"`, `"neutral"`, `"calm"`, `"relaxed"`, `"sleepy"` | Yes |
+| `heart_rate` | integer | 30-220 bpm | Yes |
+| `hrv` | integer | 5-300 ms (RMSSD) | Yes |
+| `respiration_rate` | float | 4-40 breaths/min | Yes |
+| `stress_level` | float | 0.0-1.0 | Yes |
+| `soundscape` | string | Must match a key in manifest.json | Yes (in preferences) |
+| `volume` | float | 0.0-1.0 | Yes (in preferences) |
+
+State updates are throttled to a maximum of 1 per second per session. Excess updates are dropped (latest wins).
 
 ## Component 2: Job System (Redis)
 
@@ -126,7 +161,7 @@ The Worker Manager polls for jobs in `running` status whose worker heartbeat key
 
 ## Component 3: Worker Manager (Node.js)
 
-Runs as a separate module alongside the API (same Node.js process or separate). Responsibilities:
+Runs as a **separate Node.js process** from the API. This ensures the API stays responsive even if the Worker Manager is busy spawning/monitoring engines, and a crash in either process does not affect the other. Responsibilities:
 
 - **Watch Redis** for jobs with `pending` status
 - **Spawn** a C++ CUDA engine process per job, passing config via command-line args or Unix socket handshake
@@ -134,6 +169,17 @@ Runs as a separate module alongside the API (same Node.js process or separate). 
 - **Monitor child processes**: detect crashes via exit event, update job status to `failed`
 - **Heartbeat**: periodically set `snora:worker:{pid}` with TTL in Redis
 - **Enforce limits**: cap concurrent sessions per container based on GPU memory (`MAX_CONCURRENT_SESSIONS` env var)
+- **Session limits**: max session duration of 12 hours (auto-stop). Idle timeout of 30 minutes (no state updates received → auto-stop). Both configurable via env vars `MAX_SESSION_DURATION_HOURS` and `IDLE_TIMEOUT_MINUTES`.
+
+### Graceful Shutdown
+
+When the container receives SIGTERM:
+
+1. Stop accepting new sessions (Worker Manager stops polling for `pending` jobs)
+2. Send `shutdown` message to all active engine processes via Unix socket
+3. Wait up to 30 seconds for engines to leave Agora channels and exit
+4. Update all remaining jobs to `stopped` status in Redis
+5. Exit process
 
 ## Component 4: CUDA Audio Engine (C++ Process)
 
@@ -143,7 +189,8 @@ One process per active session. Receives initial config on startup and state upd
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  Per-frame (10ms = 480 samples @ 48kHz stereo)  │
+│  Per-frame (10ms @ 48kHz stereo)                │
+│  480 samples/channel x 2 = 960 samples = 1920B  │
 │                                                  │
 │  1. curand white noise generation                │
 │  2. Spectral tilt filter (slope from HR/HRV)     │
@@ -161,7 +208,7 @@ One process per active session. Receives initial config on startup and state upd
 - Sample rate: 48kHz
 - Channels: 2 (stereo, required for binaural beats)
 - Bits per sample: 16
-- Frame size: 10ms = 960 samples (480 per channel)
+- Frame size: 10ms = 480 samples/channel x 2 channels = 960 samples total = 1920 bytes
 
 ### Algorithm Details
 
@@ -191,6 +238,10 @@ Respiration entrainment:
   Input: respiration_rate (current breaths/min)
   Output: amplitude modulation frequency
   Target: gradually guide toward 5.5 bpm (optimal for sleep HRV)
+  session_progress: clamp(elapsed_minutes / 20.0, 0.0, 1.0)
+    — ramps from 0 to 1 over the first 20 minutes of the session
+    — at 0: AM frequency matches user's current respiration rate
+    — at 1: AM frequency reaches target 5.5 bpm
   Formula: am_freq = lerp(current_respiration, 5.5, session_progress) / 60.0
 
 Binaural beat frequency:
@@ -198,7 +249,7 @@ Binaural beat frequency:
   Output: frequency difference between L/R channels
   Stressed/anxious: alpha range (8-12Hz) for relaxation
   Calm/sleepy: delta range (0.5-4Hz) for deep sleep promotion
-  Carrier frequency: ~200Hz
+  Carrier frequency: 200Hz
 
 Nature layer gain:
   Input: stress_level
@@ -232,7 +283,7 @@ Nature layer gain:
 ### Error Handling
 
 - If Agora connection drops: engine continues generating audio, discards output buffers. Worker Manager detects via heartbeat and can attempt reconnect or mark job as `failed`.
-- Token expiry: engine receives callback, Worker Manager can request a fresh token from the API caller.
+- Token expiry: engine receives `onTokenPrivilegeWillExpire` callback, sends `status` message with `{"reason": "token_expiring"}` to Worker Manager. Worker Manager updates job status to `token_expiring` in Redis. The client is expected to poll `GET /sessions/:id` and provide a new token via `PUT /sessions/:id/token` before expiry. If no new token is received within 60 seconds, the job is marked `failed`.
 
 ## Component 6: Nature Sound Assets
 
@@ -288,7 +339,7 @@ Nature layer gain:
 
 ### Audio File Requirements
 
-- Format: WAV, 48kHz, stereo, 16-bit PCM
+- Format: WAV, 48kHz, mono or stereo, 16-bit PCM (mono files are mixed to stereo at the GPU layer)
 - Seamless loop points baked into the files (start and end samples match)
 - Recommended loop length: 30-120 seconds
 
