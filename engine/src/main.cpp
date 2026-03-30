@@ -146,12 +146,12 @@ int main(int argc, char* argv[]) {
     const auto messages = ipc.poll_messages(0);
     for (const auto& msg : messages) {
       if (msg.type == "state_update") {
-        snora::PhysioState physio = state.physio();  // copy current as base
-        physio.mood              = msg.data.value("mood",              physio.mood);
-        physio.heart_rate        = msg.data.value("heart_rate",        physio.heart_rate);
-        physio.hrv               = msg.data.value("hrv",               physio.hrv);
-        physio.respiration_rate  = msg.data.value("respiration_rate",  physio.respiration_rate);
-        physio.stress_level      = msg.data.value("stress_level",      physio.stress_level);
+        snora::PhysioState physio = state.physio();
+        physio.mood = msg.data.value("mood", physio.mood);
+        physio.heart_rate = msg.data.value("heart_rate", physio.heart_rate);
+        physio.hrv = msg.data.value("hrv", physio.hrv);
+        physio.respiration_rate = msg.data.value("respiration_rate", physio.respiration_rate);
+        physio.stress_level = msg.data.value("stress_level", physio.stress_level);
         state.updatePhysio(physio);
 
         snora::IpcMessage a;
@@ -174,7 +174,8 @@ int main(int argc, char* argv[]) {
       }
     }
 
-    if (!g_running) break;
+    if (!g_running)
+      break;
 
     // ---- Compute audio parameters from current physio state --------------
     const auto audio_params = snora::mapPhysioToAudio(
