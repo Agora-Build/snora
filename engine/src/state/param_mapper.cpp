@@ -105,11 +105,10 @@ AudioParams mapExercise(const PhysioState &physio, const SessionConfig &config,
 }
 
 // ── Meditation ─────────────────────────────────────────────────────────
-// Mindfulness and present awareness. Smooth, warm tone. Theta binaural (4-8 Hz).
-// Very slow breathing target: guide toward 4 bpm over 15 minutes.
+// Mindfulness. Smooth, warm tone. Theta binaural (4-8 Hz).
+// Guide toward 4 bpm over 15 minutes.
 AudioParams mapMeditation(const PhysioState &physio,
-                          const SessionConfig &config,
-                          float elapsed_minutes) {
+                          const SessionConfig &config, float elapsed_minutes) {
   AudioParams params;
 
   // Warm and smooth — more filtering than sleep
