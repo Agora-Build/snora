@@ -5,18 +5,17 @@
 
 namespace snora {
 
-// One-pole IIR shelving filter that tilts the spectrum.
-// slope controls rolloff: -6 dB/oct (brown/heavy) to -2 dB/oct (near pink).
-// Algorithm: slope_coeff = slope / -6.0 (normalized 0..1)
-//            y[n] = (1 - |slope_coeff|) * x[n] + slope_coeff * y[n-1]
+// Multi-pole IIR shelving filter that tilts the spectrum.
+// slope controls rolloff: -6 dB/oct (brown/heavy) to 0 (no filtering).
+// Uses 3 cascaded one-pole stages for a more audible effect.
 // Processes stereo interleaved buffer in-place.
 class SpectralTilt {
 public:
-  // slope: -6 to -2 (or 0 for no filtering)
   void process(int16_t *buffer, int num_samples, float slope);
 
 private:
-  float prev_[CHANNELS] = {0.0f, 0.0f}; // per-channel filter state
+  static constexpr int STAGES = 3;
+  float prev_[STAGES][CHANNELS] = {};
 };
 
 } // namespace snora

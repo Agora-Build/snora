@@ -29,8 +29,11 @@ void AmplitudeMod::process(int16_t *buffer, int num_samples, float am_freq_hz) {
   for (int i = 0; i < num_samples; ++i) {
     float env = asymmetric_envelope(phase_);
 
+    // Map envelope [0,1] to [0.4, 1.0] so audio never goes fully silent
+    float depth = 0.4f + env * 0.6f;
+
     // Multiply sample by envelope
-    float sample = static_cast<float>(buffer[i]) * env;
+    float sample = static_cast<float>(buffer[i]) * depth;
     float clamped = std::max(-32767.0f, std::min(32767.0f, sample));
     buffer[i] = static_cast<int16_t>(clamped);
 

@@ -45,10 +45,12 @@ void AudioPipeline::processFrame(int16_t *output, const AudioParams &params) {
   float master_vol = volume_smoother_.smooth();
 
   // ------------------------------------------------------------------ //
-  // Step 2: generate noise bed (soft, colored by slope)
+  // Step 2: generate noise bed — louder when stressed, softer when calm
   // ------------------------------------------------------------------ //
   static int16_t noise_buf[FRAME_SAMPLES];
-  noise_gen_.generate(noise_buf, slope, 0.15f);
+  float stress_norm = std::clamp(slope / -6.0f, 0.0f, 1.0f);
+  float noise_amp = 0.08f + 0.25f * stress_norm;
+  noise_gen_.generate(noise_buf, slope, noise_amp);
 
   // ------------------------------------------------------------------ //
   // Step 3: generate binaural tones
@@ -75,12 +77,16 @@ void AudioPipeline::processFrame(int16_t *output, const AudioParams &params) {
   static int16_t proc_buf[FRAME_SAMPLES];
   std::memset(proc_buf, 0, sizeof(proc_buf));
 
+  // Texture intensity varies with slope: calmer (slope near -2) = louder texture,
+  // stressed (slope near -6) = quieter texture (noise bed fills in instead)
+  float tex_intensity = 0.5f + 0.5f * (1.0f - std::clamp(slope / -6.0f, 0.0f, 1.0f));
+
   if (soundscape_ == "rain") {
-    rain_.process(proc_buf, FRAME_SAMPLES, 0.8f);
+    rain_.process(proc_buf, FRAME_SAMPLES, tex_intensity);
   } else if (soundscape_ == "wind") {
-    wind_.process(proc_buf, FRAME_SAMPLES, 0.8f);
+    wind_.process(proc_buf, FRAME_SAMPLES, tex_intensity);
   } else if (soundscape_ == "ocean") {
-    ocean_.process(proc_buf, FRAME_SAMPLES, 0.8f);
+    ocean_.process(proc_buf, FRAME_SAMPLES, tex_intensity);
   }
 
   // ------------------------------------------------------------------ //
