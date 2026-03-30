@@ -1,6 +1,6 @@
 # Snora
 
-GPU-powered adaptive sleep audio service. Generates personalized soundscapes (ocean waves, rain, wind) in real-time based on physiological signals (heart rate, HRV, respiration, stress level, mood) and streams audio to clients via Agora Server Gateway SDK.
+Bio-adaptive audio engine for sleep, focus, exercise, and meditation. Generates personalized soundscapes (ocean, rain, wind) in real-time based on physiological signals (heart rate, HRV, respiration, stress, mood) and streams audio to clients via Agora RTC.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
