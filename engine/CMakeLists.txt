@@ -104,6 +104,7 @@ if(SNORA_BUILD_TESTS)
     tests/test_pipeline.cpp
     tests/test_socket_server.cpp
     tests/test_session_lifecycle.cpp
+    tests/test_audio_quality.cpp
     tests/test_e2e_engine.cpp
   )
   target_link_libraries(snora-engine-tests PRIVATE snora-engine-lib GTest::gtest_main)
