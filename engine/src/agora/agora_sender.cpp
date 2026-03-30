@@ -1,18 +1,17 @@
 #include "agora/agora_sender.h"
 #include "audio/audio_format.h"
 
-#include <cstdio>
 #include <chrono>
+#include <cstdio>
 
 namespace snora {
 
 AgoraSender::AgoraSender() = default;
 
-AgoraSender::~AgoraSender() {
-  leave();
-}
+AgoraSender::~AgoraSender() { leave(); }
 
-void AgoraSender::emitEvent(const std::string& event, const std::string& detail) {
+void AgoraSender::emitEvent(const std::string &event,
+                            const std::string &detail) {
   if (callback_) {
     callback_(event, detail);
   }
@@ -23,14 +22,16 @@ void AgoraSender::emitEvent(const std::string& event, const std::string& detail)
 // ---------------------------------------------------------------------------
 
 void AgoraSender::ConnectionObserver::onConnected(
-    const agora::rtc::TConnectionInfo&, agora::rtc::CONNECTION_CHANGED_REASON_TYPE) {
+    const agora::rtc::TConnectionInfo &,
+    agora::rtc::CONNECTION_CHANGED_REASON_TYPE) {
   fprintf(stderr, "{\"level\":\"info\",\"msg\":\"Agora: connected\"}\n");
   connected_ = true;
   connect_cv_.notify_all();
 }
 
 void AgoraSender::ConnectionObserver::onDisconnected(
-    const agora::rtc::TConnectionInfo&, agora::rtc::CONNECTION_CHANGED_REASON_TYPE) {
+    const agora::rtc::TConnectionInfo &,
+    agora::rtc::CONNECTION_CHANGED_REASON_TYPE) {
   fprintf(stderr, "{\"level\":\"warn\",\"msg\":\"Agora: disconnected\"}\n");
   connected_ = false;
   sender_->connected_ = false;
@@ -38,24 +39,27 @@ void AgoraSender::ConnectionObserver::onDisconnected(
 }
 
 void AgoraSender::ConnectionObserver::onConnecting(
-    const agora::rtc::TConnectionInfo&, agora::rtc::CONNECTION_CHANGED_REASON_TYPE) {
+    const agora::rtc::TConnectionInfo &,
+    agora::rtc::CONNECTION_CHANGED_REASON_TYPE) {
   fprintf(stderr, "{\"level\":\"info\",\"msg\":\"Agora: connecting\"}\n");
 }
 
 void AgoraSender::ConnectionObserver::onReconnecting(
-    const agora::rtc::TConnectionInfo&, agora::rtc::CONNECTION_CHANGED_REASON_TYPE) {
+    const agora::rtc::TConnectionInfo &,
+    agora::rtc::CONNECTION_CHANGED_REASON_TYPE) {
   fprintf(stderr, "{\"level\":\"warn\",\"msg\":\"Agora: reconnecting\"}\n");
 }
 
 void AgoraSender::ConnectionObserver::onReconnected(
-    const agora::rtc::TConnectionInfo&, agora::rtc::CONNECTION_CHANGED_REASON_TYPE) {
+    const agora::rtc::TConnectionInfo &,
+    agora::rtc::CONNECTION_CHANGED_REASON_TYPE) {
   fprintf(stderr, "{\"level\":\"info\",\"msg\":\"Agora: reconnected\"}\n");
   connected_ = true;
   sender_->connected_ = true;
 }
 
 void AgoraSender::ConnectionObserver::onConnectionLost(
-    const agora::rtc::TConnectionInfo&) {
+    const agora::rtc::TConnectionInfo &) {
   fprintf(stderr, "{\"level\":\"error\",\"msg\":\"Agora: connection lost\"}\n");
   connected_ = false;
   sender_->connected_ = false;
@@ -63,13 +67,15 @@ void AgoraSender::ConnectionObserver::onConnectionLost(
 }
 
 void AgoraSender::ConnectionObserver::onConnectionFailure(
-    const agora::rtc::TConnectionInfo&, agora::rtc::CONNECTION_CHANGED_REASON_TYPE) {
-  fprintf(stderr, "{\"level\":\"error\",\"msg\":\"Agora: connection failure\"}\n");
+    const agora::rtc::TConnectionInfo &,
+    agora::rtc::CONNECTION_CHANGED_REASON_TYPE) {
+  fprintf(stderr,
+          "{\"level\":\"error\",\"msg\":\"Agora: connection failure\"}\n");
   sender_->connected_ = false;
   sender_->emitEvent("agora_disconnected");
 }
 
-void AgoraSender::ConnectionObserver::onTokenPrivilegeWillExpire(const char*) {
+void AgoraSender::ConnectionObserver::onTokenPrivilegeWillExpire(const char *) {
   fprintf(stderr, "{\"level\":\"warn\",\"msg\":\"Agora: token expiring\"}\n");
   sender_->emitEvent("token_expiring");
 }
@@ -80,8 +86,10 @@ void AgoraSender::ConnectionObserver::onTokenPrivilegeDidExpire() {
 }
 
 void AgoraSender::ConnectionObserver::onUserJoined(agora::user_id_t userId) {
-  fprintf(stderr, "{\"level\":\"info\",\"msg\":\"Agora: user joined\",\"user\":\"%s\"}\n",
-          userId ? userId : "unknown");
+  fprintf(
+      stderr,
+      "{\"level\":\"info\",\"msg\":\"Agora: user joined\",\"user\":\"%s\"}\n",
+      userId ? userId : "unknown");
   {
     std::lock_guard<std::mutex> lock(sender_->users_mutex_);
     sender_->remote_users_.insert(userId ? userId : "");
@@ -91,7 +99,8 @@ void AgoraSender::ConnectionObserver::onUserJoined(agora::user_id_t userId) {
 
 void AgoraSender::ConnectionObserver::onUserLeft(
     agora::user_id_t userId, agora::rtc::USER_OFFLINE_REASON_TYPE) {
-  fprintf(stderr, "{\"level\":\"info\",\"msg\":\"Agora: user left\",\"user\":\"%s\"}\n",
+  fprintf(stderr,
+          "{\"level\":\"info\",\"msg\":\"Agora: user left\",\"user\":\"%s\"}\n",
           userId ? userId : "unknown");
   bool no_subscribers = false;
   {
@@ -106,7 +115,8 @@ void AgoraSender::ConnectionObserver::onUserLeft(
 
 void AgoraSender::ConnectionObserver::waitUntilConnected(int timeout_ms) {
   std::unique_lock<std::mutex> lock(connect_mutex_);
-  if (connected_) return;
+  if (connected_)
+    return;
   connect_cv_.wait_for(lock, std::chrono::milliseconds(timeout_ms),
                        [this]() { return connected_.load(); });
 }
@@ -115,14 +125,17 @@ void AgoraSender::ConnectionObserver::waitUntilConnected(int timeout_ms) {
 // AgoraSender
 // ---------------------------------------------------------------------------
 
-bool AgoraSender::init(const std::string& app_id, const std::string& token,
-                       const std::string& channel, AgoraEventCallback callback) {
+bool AgoraSender::init(const std::string &app_id, const std::string &token,
+                       const std::string &channel,
+                       AgoraEventCallback callback) {
   callback_ = callback;
 
   // 1. Create and initialize Agora service (global singleton)
   service_ = createAgoraService();
   if (!service_) {
-    fprintf(stderr, "{\"level\":\"error\",\"msg\":\"Failed to create Agora service\"}\n");
+    fprintf(
+        stderr,
+        "{\"level\":\"error\",\"msg\":\"Failed to create Agora service\"}\n");
     return false;
   }
 
@@ -133,7 +146,8 @@ bool AgoraSender::init(const std::string& app_id, const std::string& token,
   scfg.enableVideo = false;
 
   if (service_->initialize(scfg) != agora::ERR_OK) {
-    fprintf(stderr, "{\"level\":\"error\",\"msg\":\"Failed to initialize Agora service\"}\n");
+    fprintf(stderr, "{\"level\":\"error\",\"msg\":\"Failed to initialize Agora "
+                    "service\"}\n");
     service_ = nullptr;
     return false;
   }
@@ -141,14 +155,17 @@ bool AgoraSender::init(const std::string& app_id, const std::string& token,
   // 2. Create media node factory and audio PCM sender
   auto factory = service_->createMediaNodeFactory();
   if (!factory) {
-    fprintf(stderr, "{\"level\":\"error\",\"msg\":\"Failed to create media node factory\"}\n");
+    fprintf(stderr, "{\"level\":\"error\",\"msg\":\"Failed to create media "
+                    "node factory\"}\n");
     leave();
     return false;
   }
 
   pcm_sender_ = factory->createAudioPcmDataSender();
   if (!pcm_sender_) {
-    fprintf(stderr, "{\"level\":\"error\",\"msg\":\"Failed to create PCM data sender\"}\n");
+    fprintf(
+        stderr,
+        "{\"level\":\"error\",\"msg\":\"Failed to create PCM data sender\"}\n");
     leave();
     return false;
   }
@@ -156,7 +173,8 @@ bool AgoraSender::init(const std::string& app_id, const std::string& token,
   // 3. Create custom audio track
   audio_track_ = service_->createCustomAudioTrack(pcm_sender_);
   if (!audio_track_) {
-    fprintf(stderr, "{\"level\":\"error\",\"msg\":\"Failed to create audio track\"}\n");
+    fprintf(stderr,
+            "{\"level\":\"error\",\"msg\":\"Failed to create audio track\"}\n");
     leave();
     return false;
   }
@@ -170,7 +188,9 @@ bool AgoraSender::init(const std::string& app_id, const std::string& token,
 
   connection_ = service_->createRtcConnection(ccfg);
   if (!connection_) {
-    fprintf(stderr, "{\"level\":\"error\",\"msg\":\"Failed to create RTC connection\"}\n");
+    fprintf(
+        stderr,
+        "{\"level\":\"error\",\"msg\":\"Failed to create RTC connection\"}\n");
     leave();
     return false;
   }
@@ -181,7 +201,8 @@ bool AgoraSender::init(const std::string& app_id, const std::string& token,
 
   // 6. Connect to channel
   if (connection_->connect(token.c_str(), channel.c_str(), "snora")) {
-    fprintf(stderr, "{\"level\":\"error\",\"msg\":\"Failed to connect to Agora channel\"}\n");
+    fprintf(stderr, "{\"level\":\"error\",\"msg\":\"Failed to connect to Agora "
+                    "channel\"}\n");
     leave();
     return false;
   }
@@ -201,8 +222,9 @@ bool AgoraSender::init(const std::string& app_id, const std::string& token,
   return true;
 }
 
-bool AgoraSender::sendFrame(const int16_t* data, int num_samples) {
-  if (!connected_ || !pcm_sender_) return false;
+bool AgoraSender::sendFrame(const int16_t *data, int num_samples) {
+  if (!connected_ || !pcm_sender_)
+    return false;
 
   // num_samples is total interleaved (960 for stereo 10ms at 48kHz)
   // sendAudioPcmData wants samples_per_channel (480)
@@ -210,19 +232,18 @@ bool AgoraSender::sendFrame(const int16_t* data, int num_samples) {
 
   if (pcm_sender_->sendAudioPcmData(
           data,
-          0,  // capture_timestamp (0 = SDK uses internal clock)
-          0,  // capture_timestamp_extra
-          samples_per_channel,
-          agora::rtc::TWO_BYTES_PER_SAMPLE,
-          CHANNELS,
+          0, // capture_timestamp (0 = SDK uses internal clock)
+          0, // capture_timestamp_extra
+          samples_per_channel, agora::rtc::TWO_BYTES_PER_SAMPLE, CHANNELS,
           SAMPLE_RATE) < 0) {
     return false;
   }
   return true;
 }
 
-bool AgoraSender::renewToken(const std::string& new_token) {
-  if (!connection_) return false;
+bool AgoraSender::renewToken(const std::string &new_token) {
+  if (!connection_)
+    return false;
   return connection_->renewToken(new_token.c_str()) == agora::ERR_OK;
 }
 
@@ -256,4 +277,4 @@ void AgoraSender::leave() {
   fprintf(stderr, "{\"level\":\"info\",\"msg\":\"Agora: left channel\"}\n");
 }
 
-}  // namespace snora
+} // namespace snora

@@ -1,10 +1,10 @@
 #include "ipc/message.h"
-#include <stdexcept>
 #include <cstring>
+#include <stdexcept>
 
 namespace snora {
 
-IpcMessage IpcMessage::from_json(const nlohmann::json& j) {
+IpcMessage IpcMessage::from_json(const nlohmann::json &j) {
   IpcMessage msg;
   msg.type = j.at("type").get<std::string>();
   if (j.contains("data")) {
@@ -22,7 +22,7 @@ nlohmann::json IpcMessage::to_json() const {
   return j;
 }
 
-std::vector<uint8_t> encode_message(const IpcMessage& msg) {
+std::vector<uint8_t> encode_message(const IpcMessage &msg) {
   std::string payload = msg.to_json().dump();
   if (payload.size() > MessageDecoder::MAX_MESSAGE_SIZE) {
     throw std::runtime_error("Message exceeds max size");
@@ -38,27 +38,29 @@ std::vector<uint8_t> encode_message(const IpcMessage& msg) {
   return result;
 }
 
-std::vector<IpcMessage> MessageDecoder::feed(const uint8_t* data, size_t len) {
+std::vector<IpcMessage> MessageDecoder::feed(const uint8_t *data, size_t len) {
   std::vector<IpcMessage> messages;
   buffer_.insert(buffer_.end(), data, data + len);
 
   while (true) {
     if (!reading_payload_) {
-      if (buffer_.size() < 4) break;
+      if (buffer_.size() < 4)
+        break;
       expected_length_ = (static_cast<uint32_t>(buffer_[0]) << 24) |
-                          (static_cast<uint32_t>(buffer_[1]) << 16) |
-                          (static_cast<uint32_t>(buffer_[2]) << 8) |
-                          static_cast<uint32_t>(buffer_[3]);
+                         (static_cast<uint32_t>(buffer_[1]) << 16) |
+                         (static_cast<uint32_t>(buffer_[2]) << 8) |
+                         static_cast<uint32_t>(buffer_[3]);
       buffer_.erase(buffer_.begin(), buffer_.begin() + 4);
 
       if (expected_length_ > MAX_MESSAGE_SIZE) {
         buffer_.clear();
-        break;  // drop oversized message
+        break; // drop oversized message
       }
       reading_payload_ = true;
     }
 
-    if (buffer_.size() < expected_length_) break;
+    if (buffer_.size() < expected_length_)
+      break;
 
     std::string payload(buffer_.begin(), buffer_.begin() + expected_length_);
     buffer_.erase(buffer_.begin(), buffer_.begin() + expected_length_);
@@ -75,4 +77,4 @@ std::vector<IpcMessage> MessageDecoder::feed(const uint8_t* data, size_t len) {
   return messages;
 }
 
-}  // namespace snora
+} // namespace snora

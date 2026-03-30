@@ -1,15 +1,15 @@
 #include "audio/spectral_tilt.h"
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 
 namespace snora {
 
-void SpectralTilt::process(int16_t* buffer, int num_samples, float slope) {
+void SpectralTilt::process(int16_t *buffer, int num_samples, float slope) {
   // Normalize slope to [0, 1]: slope=-6 -> coeff=1, slope=0 -> coeff=0
   float coeff = slope / -6.0f;
   coeff = std::max(0.0f, std::min(1.0f, coeff));
 
-  float pass = 1.0f - coeff;  // feedthrough coefficient
+  float pass = 1.0f - coeff; // feedthrough coefficient
 
   // num_samples is the total count of interleaved samples (L+R pairs).
   // Iterate over frames: each frame has CHANNELS samples.
@@ -29,4 +29,4 @@ void SpectralTilt::process(int16_t* buffer, int num_samples, float slope) {
   }
 }
 
-}  // namespace snora
+} // namespace snora

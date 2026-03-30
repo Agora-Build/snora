@@ -11,12 +11,12 @@ namespace snora {
 //            y[n] = (1 - |slope_coeff|) * x[n] + slope_coeff * y[n-1]
 // Processes stereo interleaved buffer in-place.
 class SpectralTilt {
- public:
+public:
   // slope: -6 to -2 (or 0 for no filtering)
-  void process(int16_t* buffer, int num_samples, float slope);
+  void process(int16_t *buffer, int num_samples, float slope);
 
- private:
-  float prev_[CHANNELS] = {0.0f, 0.0f};  // per-channel filter state
+private:
+  float prev_[CHANNELS] = {0.0f, 0.0f}; // per-channel filter state
 };
 
-}  // namespace snora
+} // namespace snora

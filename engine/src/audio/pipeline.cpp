@@ -1,21 +1,18 @@
 #include "audio/pipeline.h"
 
-#include <cstring>
 #include <algorithm>
+#include <cstring>
 
 namespace snora {
 
 AudioPipeline::AudioPipeline()
     : rain_(ProceduralTexture::Type::Rain),
       wind_(ProceduralTexture::Type::Wind),
-      ocean_(ProceduralTexture::Type::Ocean),
-      slope_smoother_(3.0f),
-      am_smoother_(0.05f),
-      binaural_smoother_(10.0f),
-      nature_smoother_(15.0f),
+      ocean_(ProceduralTexture::Type::Ocean), slope_smoother_(3.0f),
+      am_smoother_(0.05f), binaural_smoother_(10.0f), nature_smoother_(15.0f),
       volume_smoother_(0.05f) {}
 
-bool AudioPipeline::init(const SessionConfig& config) {
+bool AudioPipeline::init(const SessionConfig &config) {
   soundscape_ = config.soundscape;
 
   // Set initial smoother values to sensible defaults so there is no
@@ -34,7 +31,7 @@ bool AudioPipeline::init(const SessionConfig& config) {
   return true;
 }
 
-void AudioPipeline::processFrame(int16_t* output, const AudioParams& params) {
+void AudioPipeline::processFrame(int16_t *output, const AudioParams &params) {
   // ------------------------------------------------------------------ //
   // Step 1: update smoother targets
   // ------------------------------------------------------------------ //
@@ -45,9 +42,9 @@ void AudioPipeline::processFrame(int16_t* output, const AudioParams& params) {
   volume_smoother_.setTarget(params.master_volume);
 
   // Step 2: advance smoothers to get values for this frame
-  float slope   = slope_smoother_.smooth();
+  float slope = slope_smoother_.smooth();
   float am_freq = am_smoother_.smooth();
-  float bin_hz  = binaural_smoother_.smooth();
+  float bin_hz = binaural_smoother_.smooth();
   float nature_gain = nature_smoother_.smooth();
   float master_vol = volume_smoother_.smooth();
 
@@ -73,8 +70,8 @@ void AudioPipeline::processFrame(int16_t* output, const AudioParams& params) {
   static int16_t binaural_buf[FRAME_SAMPLES];
   std::memset(binaural_buf, 0, sizeof(binaural_buf));
   if (params.binaural_enabled) {
-    binaural_.process(binaural_buf, FRAME_SAMPLES,
-                      params.binaural_carrier, bin_hz, 0.25f);
+    binaural_.process(binaural_buf, FRAME_SAMPLES, params.binaural_carrier,
+                      bin_hz, 0.25f);
   }
 
   // ------------------------------------------------------------------ //
@@ -105,12 +102,12 @@ void AudioPipeline::processFrame(int16_t* output, const AudioParams& params) {
   // ------------------------------------------------------------------ //
   mixer_.mix(
       {
-          {noise_buf,    0.6f},
+          {noise_buf, 0.6f},
           {binaural_buf, 0.4f},
-          {proc_buf,     0.4f},
-          {nature_buf,   0.5f},
+          {proc_buf, 0.4f},
+          {nature_buf, 0.5f},
       },
       output, FRAME_SAMPLES, master_vol);
 }
 
-}  // namespace snora
+} // namespace snora

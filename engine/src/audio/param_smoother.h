@@ -3,9 +3,9 @@
 namespace snora {
 
 class ParamSmoother {
- public:
+public:
   explicit ParamSmoother(float smoothing_seconds, float sample_rate = 48000.0f,
-                          int frame_samples = 480);
+                         int frame_samples = 480);
 
   void setTarget(float target);
   void setImmediate(float value);
@@ -13,11 +13,11 @@ class ParamSmoother {
   float target() const;
   float smooth();
 
- private:
+private:
   float current_;
   float target_;
   float alpha_;
   int frame_samples_;
 };
 
-}  // namespace snora
+} // namespace snora

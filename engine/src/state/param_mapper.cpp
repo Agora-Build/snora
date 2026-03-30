@@ -6,9 +6,7 @@ namespace snora {
 
 namespace {
 
-float lerp(float a, float b, float t) {
-  return a + t * (b - a);
-}
+float lerp(float a, float b, float t) { return a + t * (b - a); }
 
 float clamp(float v, float lo, float hi) {
   return std::max(lo, std::min(hi, v));
@@ -16,16 +14,19 @@ float clamp(float v, float lo, float hi) {
 
 enum class MoodRange { Alpha, Theta, Delta };
 
-MoodRange moodToRange(const std::string& mood) {
-  if (mood == "anxious" || mood == "stressed") return MoodRange::Alpha;
-  if (mood == "neutral") return MoodRange::Theta;
-  return MoodRange::Delta;  // calm, relaxed, sleepy
+MoodRange moodToRange(const std::string &mood) {
+  if (mood == "anxious" || mood == "stressed")
+    return MoodRange::Alpha;
+  if (mood == "neutral")
+    return MoodRange::Theta;
+  return MoodRange::Delta; // calm, relaxed, sleepy
 }
 
-}  // namespace
+} // namespace
 
-AudioParams mapPhysioToAudio(const PhysioState& physio, const SessionConfig& config,
-                              float elapsed_minutes) {
+AudioParams mapPhysioToAudio(const PhysioState &physio,
+                             const SessionConfig &config,
+                             float elapsed_minutes) {
   AudioParams params;
 
   // Spectral tilt slope: lerp(-6, -2, 1 - stress_level)
@@ -40,18 +41,18 @@ AudioParams mapPhysioToAudio(const PhysioState& physio, const SessionConfig& con
   params.binaural_enabled = config.binaural_beats;
   auto range = moodToRange(physio.mood);
   switch (range) {
-    case MoodRange::Alpha:
-      // Anxious/stressed: alpha range 8-12 Hz
-      params.binaural_hz = lerp(8.0f, 12.0f, physio.stress_level);
-      break;
-    case MoodRange::Theta:
-      // Neutral: theta range 4-8 Hz
-      params.binaural_hz = lerp(4.0f, 8.0f, physio.stress_level);
-      break;
-    case MoodRange::Delta:
-      // Calm/relaxed/sleepy: delta range 0.5-4 Hz
-      params.binaural_hz = lerp(0.5f, 4.0f, physio.stress_level);
-      break;
+  case MoodRange::Alpha:
+    // Anxious/stressed: alpha range 8-12 Hz
+    params.binaural_hz = lerp(8.0f, 12.0f, physio.stress_level);
+    break;
+  case MoodRange::Theta:
+    // Neutral: theta range 4-8 Hz
+    params.binaural_hz = lerp(4.0f, 8.0f, physio.stress_level);
+    break;
+  case MoodRange::Delta:
+    // Calm/relaxed/sleepy: delta range 0.5-4 Hz
+    params.binaural_hz = lerp(0.5f, 4.0f, physio.stress_level);
+    break;
   }
   params.binaural_carrier = 200.0f;
 
@@ -64,4 +65,4 @@ AudioParams mapPhysioToAudio(const PhysioState& physio, const SessionConfig& con
   return params;
 }
 
-}  // namespace snora
+} // namespace snora
