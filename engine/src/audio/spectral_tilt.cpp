@@ -24,8 +24,7 @@ void SpectralTilt::process(int16_t *buffer, int num_samples, float slope) {
         prev_[s][ch] = x;
       }
 
-      buffer[idx] =
-          static_cast<int16_t>(std::clamp(x, -32767.0f, 32767.0f));
+      buffer[idx] = static_cast<int16_t>(std::clamp(x, -32767.0f, 32767.0f));
     }
   }
 }

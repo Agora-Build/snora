@@ -77,9 +77,9 @@ void AudioPipeline::processFrame(int16_t *output, const AudioParams &params) {
   static int16_t proc_buf[FRAME_SAMPLES];
   std::memset(proc_buf, 0, sizeof(proc_buf));
 
-  // Texture intensity varies with slope: calmer (slope near -2) = louder texture,
-  // stressed (slope near -6) = quieter texture (noise bed fills in instead)
-  float tex_intensity = 0.5f + 0.5f * (1.0f - std::clamp(slope / -6.0f, 0.0f, 1.0f));
+  // Texture intensity varies with slope: calm = louder, stressed = quieter
+  float tex_intensity =
+      0.5f + 0.5f * (1.0f - std::clamp(slope / -6.0f, 0.0f, 1.0f));
 
   if (soundscape_ == "rain") {
     rain_.process(proc_buf, FRAME_SAMPLES, tex_intensity);
