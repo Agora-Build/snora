@@ -28,26 +28,29 @@ GPU-powered adaptive sleep audio service. Generates personalized soundscapes (oc
 
 ### Audio Pipeline
 
-Each engine process runs a 10ms frame loop (48kHz stereo 16-bit). Layers are mixed, then bio-adaptive effects are applied to the full mix:
+Each engine process runs a 10ms frame loop (48kHz stereo 16-bit). Layers are mixed, then bio-adaptive effects shape the entire output:
 
 **Layers:**
-- **Procedural textures** — algorithmic ocean waves, rain, wind (dominant layer)
-- **Noise bed** — white/pink/brown noise via Paul Kellett pinking filter, blended by stress level; soft bed underneath the soundscape
+- **Procedural textures** — algorithmic ocean waves, rain, wind (dominant layer, intensity adapts to stress)
+- **Noise bed** — white/pink/brown noise via Paul Kellett pinking filter, amplitude scales with stress level
 - **Binaural beats** — L/R frequency differential based on mood (subtle)
 - **Nature player** — WAV loops from asset files (optional)
 
 **Bio-adaptive effects (applied to full mix):**
-- **Spectral tilt** — IIR shelving filter shifts the tone: high stress = darker/warmer, low stress = brighter
-- **Amplitude modulation** — entire soundscape pulses gently at the user's breathing rate, gradually guiding respiration toward 5.5 bpm over 20 minutes
+- **Spectral tilt** — 3-pole cascaded IIR filter shifts the entire soundscape tone: stressed = dark/warm, calm = bright/clear
+- **Amplitude modulation** — entire soundscape pulses gently at the user's breathing rate (depth 0.4-1.0), gradually guiding respiration toward 5.5 bpm over 20 minutes
 
 ### How Bio Data Drives Audio
 
 | Bio Signal | Audio Effect | Range |
 |---|---|---|
-| **Stress level** (0-1) | Spectral tilt slope | High stress = -6 dB/oct (dark). Low stress = -2 dB/oct (bright) |
+| **Stress level** (0-1) | Spectral tilt slope | High stress = steep (-6 dB/oct, dark/muffled). Low stress = flat (-2 dB/oct, bright/clear) |
+| **Stress level** | Texture intensity | Calm = louder soundscape (1.0). Stressed = quieter (0.5) |
+| **Stress level** | Noise bed amplitude | Calm = soft (0.08). Stressed = louder (0.33) |
 | **Mood** (anxious/neutral/calm/sleepy) | Binaural beat frequency | Anxious = alpha 8-12 Hz. Neutral = theta 4-8 Hz. Calm/sleepy = delta 0.5-4 Hz |
 | **Respiration rate** (bpm) | AM frequency | Follows breath rate, guides toward 5.5 bpm over 20 min |
 | **Stress level** | Nature gain | High stress = more nature (0.6). Low stress = less (0.2) |
+| **Soundscape** (ocean/rain/wind) | Procedural texture | Switchable mid-session via state update |
 | **Volume** (0-1) | Master volume | User preference, smoothed transitions |
 
 All parameters smooth over time (3-15 second time constants) to prevent abrupt audio changes.
@@ -99,9 +102,10 @@ Mobile App                     Snora API                    Audio Engine
     │  🔊 ocean waves playing      │                    └─────────┤
     │                              │                              │
     │  3. PUT /sessions/:id/state  │                              │
-    │  (updated bio readings)      │  state_update via pub/sub    │
+    │  (bio data + soundscape)     │  state_update via pub/sub    │
     │─────────────────────────────▶│─────────────────────────────▶│
-    │                              │      audio adapts to mood    │
+    │                              │  audio adapts: tone, rhythm, │
+    │                              │  texture, soundscape switch   │
     │                              │                              │
     │  4. DELETE /sessions/:id     │                              │
     │─────────────────────────────▶│  shutdown                    │
@@ -178,17 +182,17 @@ await client.join("your-agora-app-id", "sleep-user-123", token);
 client.on("user-published", async (user, mediaType) => {
   if (mediaType === "audio") {
     await client.subscribe(user, mediaType);
-    user.audioTrack.play();  // 🔊 ocean waves start playing
+    user.audioTrack.play();  // ocean waves start playing
   }
 });
 ```
 
 ### Step 3: Send Bio Data Updates
 
-As the user's wearable/sensors provide new readings, push them to Snora:
+As the user's wearable/sensors provide new readings, push them to Snora. You can also switch the soundscape mid-session:
 
 ```bash
-# Every 1-5 seconds, send the latest biometric readings
+# Send bio readings (every 1-5 seconds)
 curl -X PUT https://your-snora-host/sessions/a1b2c3d4-.../state \
   -H "X-API-Key: your-key" \
   -H "Content-Type: application/json" \
@@ -197,14 +201,18 @@ curl -X PUT https://your-snora-host/sessions/a1b2c3d4-.../state \
     "heart_rate": 65,
     "hrv": 55,
     "respiration_rate": 12,
-    "stress_level": 0.2
+    "stress_level": 0.2,
+    "soundscape": "ocean"
   }'
 ```
 
-The audio will smoothly adapt:
-- Stress 0.7 → 0.2: soundscape gets brighter, nature sounds quieter
-- Mood anxious → calm: binaural shifts from alpha (8-12 Hz) to delta (0.5-4 Hz)
-- Respiration 18 → 12: AM envelope slows to match breathing, guiding toward 5.5 bpm
+The `soundscape` field is optional — include it to switch textures mid-session.
+
+What the listener hears when bio data changes:
+- **Stress 0.8 → 0.2**: tone shifts from dark/muffled to bright/clear, ocean waves get louder, noise fades
+- **Mood anxious → calm**: binaural shifts from alpha (8-12 Hz) to delta (0.5-4 Hz)
+- **Respiration 20 → 10**: breathing pulse slows, guides toward 5.5 bpm over 20 minutes
+- **Soundscape rain → ocean**: texture crossfades from rain crackle to rolling waves
 
 ### Step 4: Renew Token (Before Expiry)
 
@@ -255,7 +263,7 @@ All endpoints require `X-API-Key` header (except `/health` and `/metrics`).
 |--------|------|-------------|
 | `POST` | `/sessions` | Create a new sleep session |
 | `GET` | `/sessions/:id` | Get session status |
-| `PUT` | `/sessions/:id/state` | Update physiological state |
+| `PUT` | `/sessions/:id/state` | Update bio state and/or soundscape |
 | `PUT` | `/sessions/:id/token` | Renew Agora token |
 | `DELETE` | `/sessions/:id` | Stop a session |
 | `GET` | `/health` | Health check (Redis, active sessions) |
@@ -263,24 +271,48 @@ All endpoints require `X-API-Key` header (except `/health` and `/metrics`).
 
 ## Dev Testing
 
-Test the engine locally with a real Agora channel:
+### Full stack demo (API + Worker + Engine)
 
 ```bash
-# 1. Build the engine
+# Prerequisites: atem CLI (npm install -g @agora-build/atem), Redis
+# Select your Agora project first:
+atem login
+atem list project
+atem project use 1
+
+# Run the full demo — starts everything, cycles through bio phases
+./scripts/dev-session.sh          # default: ocean
+./scripts/dev-session.sh rain     # or: rain, wind
+
+# Join the printed channel name from any Agora RTC client to hear audio.
+# Phases cycle every 15 seconds:
+#   1. ANXIOUS  (rain, dark tone, fast breathing pulse)
+#   2. STRESSED (rain, slightly darker)
+#   3. NEUTRAL  (wind, balanced tone)
+#   4. CALM     (ocean, bright tone, slow pulse)
+#   5. SLEEPY   (ocean, brightest, deep slow pulse)
+```
+
+### Engine-only test (IPC direct)
+
+```bash
+# Build the engine
 cd engine && cmake -B build -DSNORA_CPU_MODE=ON && cmake --build build
 
-# 2. Start the engine process
+# Start the engine process
 LD_LIBRARY_PATH=third_party/agora_rtc_sdk/agora_sdk \
   build/snora-engine --socket /tmp/snora-test.sock --gpu 0 &
 
-# 3. Generate an Agora token (using atem CLI)
-atem project use 1  # select your Agora project
+# Generate token and stream with phase cycling
 TOKEN=$(atem token rtc create --channel my-test --uid 0 | grep "^007")
+npx tsx scripts/stream-live.ts /tmp/snora-test.sock YOUR_APP_ID "$TOKEN" my-test ocean
+```
 
-# 4. Connect and stream (sends init + periodic state updates)
-npx tsx scripts/stream-live.ts /tmp/snora-test.sock YOUR_APP_ID "$TOKEN" my-test
+### Quick smoke test
 
-# 5. Join "my-test" channel from any Agora RTC client to hear the audio
+```bash
+# Verify engine IPC works (no need to join Agora channel)
+npx tsx scripts/dev-test.ts /tmp/snora-test.sock YOUR_APP_ID "$TOKEN" my-test
 ```
 
 ## Testing
@@ -317,8 +349,9 @@ engine/
   src/agora/    Agora Server Gateway SDK 4.4.32 integration
   tests/        106 GoogleTest tests (unit + integration + E2E + audio quality)
 scripts/
-  stream-live.ts   Dev test script — stream to Agora with live state updates
-  dev-test.ts      Quick smoke test — init, update, shutdown
+  dev-session.sh   Full stack demo — API + Worker + Engine + bio phase cycling
+  stream-live.ts   Engine-only streaming with live state updates
+  dev-test.ts      Quick IPC smoke test
 charts/snora/      Helm chart (deployment, HPA, network policy, PDB)
 docker/            Dockerfile (multi-stage build), Dockerfile.cuda (GPU), entrypoint
 ```
