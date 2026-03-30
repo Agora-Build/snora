@@ -367,4 +367,4 @@ docker/            Dockerfile (multi-stage build), Dockerfile.cuda (GPU), entryp
 
 ## License
 
-Proprietary. All rights reserved.
+MIT
