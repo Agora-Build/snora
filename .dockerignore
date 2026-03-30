@@ -7,3 +7,4 @@ dist
 *.md
 .claude
 engine/build
+engine/third_party/agora_rtc_sdk

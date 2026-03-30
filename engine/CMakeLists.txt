@@ -23,7 +23,25 @@ if(NOT SNORA_CPU_MODE)
   add_compile_definitions(SNORA_USE_CUDA)
 endif()
 
-# Collect sources incrementally — add files as they are created
+# ---------------------------------------------------------------------------
+# Agora Server Gateway SDK (auto-download)
+# ---------------------------------------------------------------------------
+set(AGORA_SDK_URL "https://download.agora.io/rtsasdk/release/Agora-RTC-x86_64-linux-gnu-v4.4.32-20250425_144419-675648.tgz")
+set(AGORA_SDK_DIR "${CMAKE_SOURCE_DIR}/third_party/agora_rtc_sdk/agora_sdk")
+
+if(NOT EXISTS "${AGORA_SDK_DIR}/include/IAgoraService.h")
+  message(STATUS "Downloading Agora Server Gateway SDK...")
+  FetchContent_Declare(agora_sdk
+    URL ${AGORA_SDK_URL}
+    SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/agora_rtc_sdk
+  )
+  FetchContent_MakeAvailable(agora_sdk)
+endif()
+
+set(AGORA_INCLUDE_DIR "${AGORA_SDK_DIR}/include")
+set(AGORA_LIB_DIR "${AGORA_SDK_DIR}")
+
+# Collect sources
 set(ENGINE_SOURCES
   src/audio/param_smoother.cpp
   src/audio/noise_gen.cpp
@@ -42,8 +60,10 @@ set(ENGINE_SOURCES
 )
 
 add_library(snora-engine-lib STATIC ${ENGINE_SOURCES})
-target_include_directories(snora-engine-lib PUBLIC src)
+target_include_directories(snora-engine-lib PUBLIC src ${AGORA_INCLUDE_DIR})
 target_link_libraries(snora-engine-lib PUBLIC nlohmann_json::nlohmann_json)
+target_link_directories(snora-engine-lib PUBLIC ${AGORA_LIB_DIR})
+target_link_libraries(snora-engine-lib PUBLIC agora_rtc_sdk)
 
 if(SNDFILE_FOUND)
   target_include_directories(snora-engine-lib PUBLIC ${SNDFILE_INCLUDE_DIRS})
@@ -57,6 +77,12 @@ endif()
 # Main engine executable
 add_executable(snora-engine src/main.cpp)
 target_link_libraries(snora-engine PRIVATE snora-engine-lib)
+
+# Set RPATH so the binary can find libagora_rtc_sdk.so at runtime
+set_target_properties(snora-engine PROPERTIES
+  INSTALL_RPATH "${AGORA_LIB_DIR}"
+  BUILD_RPATH "${AGORA_LIB_DIR}"
+)
 
 # Tests
 if(SNORA_BUILD_TESTS)
@@ -81,6 +107,11 @@ if(SNORA_BUILD_TESTS)
     tests/test_e2e_engine.cpp
   )
   target_link_libraries(snora-engine-tests PRIVATE snora-engine-lib GTest::gtest_main)
+  set_target_properties(snora-engine-tests PROPERTIES
+    BUILD_RPATH "${AGORA_LIB_DIR}"
+  )
   include(GoogleTest)
-  gtest_discover_tests(snora-engine-tests)
+  gtest_discover_tests(snora-engine-tests
+    DISCOVERY_MODE PRE_TEST
+  )
 endif()

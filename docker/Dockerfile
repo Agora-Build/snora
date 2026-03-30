@@ -1,5 +1,5 @@
 # =============================================================================
-# Stage 1: Build C++ engine
+# Stage 1: Build C++ engine (auto-downloads Agora SDK)
 # =============================================================================
 FROM ubuntu:22.04 AS engine-builder
 
@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libsndfile1-dev \
     git \
+    curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
@@ -18,7 +19,6 @@ COPY engine/ /build/engine/
 WORKDIR /build/engine
 RUN cmake -B build -DCMAKE_BUILD_TYPE=Release \
     -DSNORA_CPU_MODE=${SNORA_CPU_MODE} \
-    -DSNORA_USE_AGORA=OFF \
     -DSNORA_BUILD_TESTS=OFF \
     && cmake --build build --target snora-engine
 
@@ -39,6 +39,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=engine-builder /build/engine/build/snora-engine /usr/local/bin/snora-engine
+COPY --from=engine-builder /build/engine/third_party/agora_rtc_sdk/agora_sdk/*.so /usr/local/lib/
+
+RUN ldconfig
 
 WORKDIR /app
 

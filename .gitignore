@@ -1,6 +1,7 @@
 /node_modules/
 /dist/
 /engine/build/
+/engine/third_party/agora_rtc_sdk/
 .env
 .env.*
 !.env.example

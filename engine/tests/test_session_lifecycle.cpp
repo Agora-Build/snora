@@ -120,15 +120,7 @@ TEST(SessionLifecycle, FullDataFlowProducesAudio) {
   snora::AudioPipeline pipeline;
   pipeline.init(config);
 
-  // 3. Init Agora stub
-  snora::AgoraSender agora;
-  std::vector<std::string> agora_events;
-  agora.init("test-app", "test-token", "test-channel",
-    [&](const std::string& event, const std::string&) {
-      agora_events.push_back(event);
-    });
-
-  // 4. Simulate 100 frames (1 second of audio) with state updates
+  // 3. Simulate 100 frames (1 second of audio) with state updates
   int16_t frame[snora::FRAME_SAMPLES];
   int nonzero_frames = 0;
 
@@ -164,16 +156,10 @@ TEST(SessionLifecycle, FullDataFlowProducesAudio) {
       if (frame[s] != 0) { has_audio = true; break; }
     }
     if (has_audio) nonzero_frames++;
-
-    // Send to Agora (stub discards but should succeed)
-    bool sent = agora.sendFrame(frame, snora::FRAME_SAMPLES);
-    EXPECT_TRUE(sent);
   }
 
   // All frames should have audio
   EXPECT_EQ(nonzero_frames, 100);
-
-  agora.leave();
 }
 
 // ---------------------------------------------------------------------------
@@ -237,31 +223,25 @@ TEST(SessionLifecycle, StateChangeAffectsAudioOutput) {
 }
 
 // ---------------------------------------------------------------------------
-// Agora stub lifecycle
+// Agora sender with invalid credentials fails gracefully
 // ---------------------------------------------------------------------------
 
-TEST(AgoraSender, StubInitSendLeaveLifecycle) {
+TEST(AgoraSender, InvalidCredentialsFailGracefully) {
   snora::AgoraSender agora;
 
-  std::vector<std::string> events;
-  bool inited = agora.init("app", "token", "ch",
-    [&](const std::string& event, const std::string&) {
-      events.push_back(event);
-    });
-  EXPECT_TRUE(inited);
+  // Init with invalid credentials — should fail but not crash
+  bool inited = agora.init("invalid-app", "invalid-token", "test-ch",
+    [](const std::string&, const std::string&) {});
 
-  // Send frames should succeed while connected
+  // Real SDK will fail to connect with invalid credentials
+  // Either way, sendFrame should return false when not connected
   int16_t silence[snora::FRAME_SAMPLES] = {};
-  EXPECT_TRUE(agora.sendFrame(silence, snora::FRAME_SAMPLES));
+  if (!inited) {
+    EXPECT_FALSE(agora.sendFrame(silence, snora::FRAME_SAMPLES));
+  }
 
-  // Token renewal should succeed
-  EXPECT_TRUE(agora.renewToken("new-token"));
-
-  // Leave
+  // leave() should not crash even if init failed
   agora.leave();
-
-  // After leave, sendFrame should fail
-  EXPECT_FALSE(agora.sendFrame(silence, snora::FRAME_SAMPLES));
 }
 
 // ---------------------------------------------------------------------------
