@@ -9,7 +9,7 @@
 set -e
 
 SOUNDSCAPE="${1:-ocean}"
-API_PORT=8080
+API_PORT="${SNORA_PORT:-9080}"
 API_KEY="demo-api-key"
 CHANNEL="snora-dev-$$"
 ENGINE_BUILD="engine/build"
@@ -39,7 +39,7 @@ if ! command -v atem >/dev/null 2>&1; then
   exit 1
 fi
 
-AGORA_APP_ID="$(atem config 2>/dev/null | grep -i 'app.*id' | head -1 | awk '{print $NF}' || echo '')"
+AGORA_APP_ID="$(atem project show 2>/dev/null | grep 'App ID' | awk '{print $NF}' || echo '')"
 
 if [ -z "$AGORA_APP_ID" ]; then
   echo "Error: Could not detect Agora App ID. Run 'atem project use <n>' first."
