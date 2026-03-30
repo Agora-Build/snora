@@ -40,16 +40,27 @@ Each engine process runs a 10ms frame loop (48kHz stereo 16-bit). Layers are mix
 - **Spectral tilt** — 3-pole cascaded IIR filter shifts the entire soundscape tone: stressed = dark/warm, calm = bright/clear
 - **Amplitude modulation** — entire soundscape pulses gently at the user's breathing rate (depth 0.4-1.0), gradually guiding respiration toward 5.5 bpm over 20 minutes
 
+### Scenarios
+
+Each scenario uses different parameter curves optimized for its purpose:
+
+| Scenario | Goal | Spectral Tone | Binaural | Breathing Guidance |
+|----------|------|--------------|----------|-------------------|
+| **sleep** | Guide to deep sleep | Dark when stressed, bright when calm | Delta 0.5-4 Hz | Toward 5.5 bpm over 20 min |
+| **focus** | Sustained concentration | Consistently bright/clear | Beta 14-20 Hz | No change (steady) |
+| **exercise** | Energize, motivate | Very bright, punchy | High-beta 20-30 Hz | Match user's pace |
+| **meditation** | Mindfulness | Smooth, warm | Theta 4-8 Hz | Toward 4 bpm over 15 min |
+| **power_nap** | Quick 20-min rest | Slightly brighter than sleep | Theta→delta transition | Toward 8 bpm over 10 min |
+
 ### How Bio Data Drives Audio
 
 | Bio Signal | Audio Effect | Range |
 |---|---|---|
-| **Stress level** (0-1) | Spectral tilt slope | High stress = steep (-6 dB/oct, dark/muffled). Low stress = flat (-2 dB/oct, bright/clear) |
-| **Stress level** | Texture intensity | Calm = louder soundscape (1.0). Stressed = quieter (0.5) |
-| **Stress level** | Noise bed amplitude | Calm = soft (0.08). Stressed = louder (0.33) |
-| **Mood** (anxious/neutral/calm/sleepy) | Binaural beat frequency | Anxious = alpha 8-12 Hz. Neutral = theta 4-8 Hz. Calm/sleepy = delta 0.5-4 Hz |
-| **Respiration rate** (bpm) | AM frequency | Follows breath rate, guides toward 5.5 bpm over 20 min |
-| **Stress level** | Nature gain | High stress = more nature (0.6). Low stress = less (0.2) |
+| **Stress level** (0-1) | Spectral tilt slope | High stress = dark/muffled. Low stress = bright/clear (range varies by scenario) |
+| **Stress level** | Texture intensity | Calm = louder soundscape. Stressed = quieter |
+| **Stress level** | Noise bed amplitude | Calm = soft. Stressed = louder |
+| **Mood** (anxious/neutral/calm/sleepy) | Binaural beat frequency | Mapped to brainwave band per scenario |
+| **Respiration rate** (bpm) | AM frequency | Follows breath rate, guided toward scenario target |
 | **Soundscape** (ocean/rain/wind) | Procedural texture | Switchable mid-session via state update |
 | **Volume** (0-1) | Master volume | User preference, smoothed transitions |
 
@@ -135,6 +146,7 @@ curl -X POST https://your-snora-host/sessions \
       "stress_level": 0.7
     },
     "preferences": {
+      "scenario": "sleep",
       "soundscape": "ocean",
       "binaural_beats": true,
       "volume": 0.7
@@ -147,6 +159,7 @@ Response:
 {"job_id": "a1b2c3d4-...", "status": "pending"}
 ```
 
+Available scenarios: `sleep`, `focus`, `exercise`, `meditation`, `power_nap`
 Available soundscapes: `ocean`, `rain`, `wind`
 
 ### Step 2: Join the Agora Channel (Client Side)
@@ -281,8 +294,10 @@ atem list project
 atem project use 1
 
 # Run the full demo — starts everything, cycles through bio phases
-./scripts/dev-session.sh          # default: ocean
-./scripts/dev-session.sh rain     # or: rain, wind
+./scripts/dev-session.sh                    # default: sleep + ocean
+./scripts/dev-session.sh focus rain         # focus scenario + rain
+./scripts/dev-session.sh exercise wind      # exercise scenario + wind
+./scripts/dev-session.sh meditation ocean   # meditation + ocean
 
 # Join the printed channel name from any Agora RTC client to hear audio.
 # Phases cycle every 15 seconds:

@@ -3,12 +3,14 @@
 # bio phases, then stop. Requires: Redis running, engine built, atem CLI.
 #
 # Usage:
-#   ./scripts/dev-session.sh [soundscape]
+#   ./scripts/dev-session.sh [scenario] [soundscape]
+#   Scenarios:   sleep (default), focus, exercise, meditation, power_nap
 #   Soundscapes: ocean (default), rain, wind
 
 set -e
 
-SOUNDSCAPE="${1:-ocean}"
+SCENARIO="${1:-sleep}"
+SOUNDSCAPE="${2:-ocean}"
 API_PORT="${SNORA_PORT:-9080}"
 API_KEY="demo-api-key"
 CHANNEL="snora-dev-$$"
@@ -56,7 +58,8 @@ redis-cli ping >/dev/null 2>&1 || docker exec snora-test-redis redis-cli ping >/
   exit 1
 }
 
-echo "=== Snora Demo Session ==="
+echo "=== Snora Dev Session ==="
+echo "Scenario:   $SCENARIO"
 echo "Soundscape: $SOUNDSCAPE"
 echo "Channel:    $CHANNEL"
 echo "App ID:     ${AGORA_APP_ID:0:8}..."
@@ -120,6 +123,7 @@ CREATE_RESPONSE=$(curl -sf -X POST "http://localhost:$API_PORT/sessions" \
     },
     \"preferences\": {
       \"soundscape\": \"$SOUNDSCAPE\",
+      \"scenario\": \"$SCENARIO\",
       \"binaural_beats\": true,
       \"volume\": 0.8
     }
@@ -150,6 +154,7 @@ echo ""
 echo "============================================"
 echo "  STREAMING on channel: $CHANNEL"
 echo "  Join with App ID: ${AGORA_APP_ID:0:8}..."
+echo "  Scenario:   $SCENARIO"
 echo "  Soundscape: $SOUNDSCAPE"
 echo "============================================"
 echo ""

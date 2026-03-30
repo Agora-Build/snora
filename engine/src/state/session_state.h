@@ -26,6 +26,7 @@ struct AudioParams {
 
 struct SessionConfig {
   std::string soundscape = "rain";
+  std::string scenario = "sleep"; // sleep, focus, exercise, meditation, power_nap
   bool binaural_beats = true;
   float volume = 0.7f;
   std::string assets_path = "/assets/sounds";

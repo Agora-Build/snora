@@ -92,6 +92,7 @@ int main(int argc, char *argv[]) {
   if (init_msg.data.contains("preferences")) {
     const auto &prefs = init_msg.data["preferences"];
     config.soundscape = prefs.value("soundscape", config.soundscape);
+    config.scenario = prefs.value("scenario", config.scenario);
     config.binaural_beats =
         prefs.value("binaural_beats", config.binaural_beats);
     config.volume = prefs.value("volume", config.volume);

@@ -36,6 +36,7 @@ export const createSessionSchema = {
       additionalProperties: false,
       properties: {
         soundscape: { type: 'string', minLength: 1 },
+        scenario: { type: 'string', enum: ['sleep', 'focus', 'exercise', 'meditation', 'power_nap'], default: 'sleep' },
         binaural_beats: { type: 'boolean', default: true },
         volume: { type: 'number', minimum: 0, maximum: 1 },
       },
