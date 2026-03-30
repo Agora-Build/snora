@@ -1,10 +1,10 @@
 # Snora
 
-GPU-powered adaptive sleep audio service. Generates personalized white noise and nature soundscapes in real-time based on physiological signals (heart rate, HRV, respiration, stress level, mood) and streams audio to clients via Agora Server Gateway SDK.
+GPU-powered adaptive sleep audio service. Generates personalized soundscapes (ocean waves, rain, wind) in real-time based on physiological signals (heart rate, HRV, respiration, stress level, mood) and streams audio to clients via Agora Server Gateway SDK.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Docker Container (nvidia/cuda)                         │
+│  Docker Container                                       │
 │                                                         │
 │  ┌──────────────┐     ┌───────────┐     ┌────────────┐ │
 │  │  Node.js API │────▶│   Redis   │◀────│  Worker    │ │
@@ -15,27 +15,42 @@ GPU-powered adaptive sleep audio service. Generates personalized white noise and
 │                                  Unix Socket  │        │
 │                                               ▼        │
 │  ┌─────────────────────────────────────────────────┐   │
-│  │  CUDA Audio Engine (C++ process, per session)   │   │
+│  │  Audio Engine (C++ process, per session)         │   │
 │  │                                                  │   │
-│  │  Noise → Spectral Tilt → AM → Binaural         │   │
-│  │  Nature WAV → Procedural → Mixer → Agora SDK   │   │
+│  │  Ocean/Rain/Wind → Noise Bed → Binaural         │   │
+│  │       ↓                                          │   │
+│  │  Mixer → Spectral Tilt → AM → Agora SDK         │   │
 │  └─────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
 ```
 
-## Audio Pipeline
+## How It Works
 
-Each engine process runs a 10ms frame loop (48kHz stereo 16-bit):
+### Audio Pipeline
 
-- **Noise generator** — white noise with Paul Kellett pinking filter
-- **Spectral tilt** — IIR shelving filter, slope adapts to stress level
-- **Amplitude modulation** — respiration entrainment, guides breathing toward 5.5 bpm
-- **Binaural beats** — L/R frequency differential based on mood (alpha/theta/delta)
-- **Nature player** — WAV loops loaded from manifest (rain, ocean, forest)
-- **Procedural textures** — algorithmic rain, wind, ocean sounds
-- **Mixer** — multi-layer with smoothed gains, clipping prevention
+Each engine process runs a 10ms frame loop (48kHz stereo 16-bit). Layers are mixed, then bio-adaptive effects are applied to the full mix:
 
-All parameters smooth over time using one-pole exponential filters. CPU fallback mode (`SNORA_CPU_MODE`) replaces CUDA kernels with plain C++ for CI/testing.
+**Layers:**
+- **Procedural textures** — algorithmic ocean waves, rain, wind (dominant layer)
+- **Noise bed** — pink/brown noise colored by stress level (soft background)
+- **Binaural beats** — L/R frequency differential based on mood (subtle)
+- **Nature player** — WAV loops from asset files (optional)
+
+**Bio-adaptive effects (applied to full mix):**
+- **Spectral tilt** — IIR shelving filter shifts the tone: high stress = darker/warmer, low stress = brighter
+- **Amplitude modulation** — entire soundscape pulses gently at the user's breathing rate, gradually guiding respiration toward 5.5 bpm over 20 minutes
+
+### How Bio Data Drives Audio
+
+| Bio Signal | Audio Effect | Range |
+|---|---|---|
+| **Stress level** (0-1) | Spectral tilt slope | High stress = -6 dB/oct (dark). Low stress = -2 dB/oct (bright) |
+| **Mood** (anxious/neutral/calm/sleepy) | Binaural beat frequency | Anxious = alpha 8-12 Hz. Neutral = theta 4-8 Hz. Calm/sleepy = delta 0.5-4 Hz |
+| **Respiration rate** (bpm) | AM frequency | Follows breath rate, guides toward 5.5 bpm over 20 min |
+| **Stress level** | Nature gain | High stress = more nature (0.6). Low stress = less (0.2) |
+| **Volume** (0-1) | Master volume | User preference, smoothed transitions |
+
+All parameters smooth over time (3-15 second time constants) to prevent abrupt audio changes.
 
 ## Quick Start
 
@@ -48,7 +63,7 @@ npm install
 npm run dev:api      # API server on :8080
 npm run dev:worker   # Worker manager
 
-# C++ engine (CPU mode for dev)
+# C++ engine (auto-downloads Agora SDK)
 cd engine
 cmake -B build -DSNORA_CPU_MODE=ON
 cmake --build build
@@ -59,6 +74,165 @@ Or with Docker Compose:
 ```bash
 docker compose up
 ```
+
+## App Integration Guide
+
+### Session Lifecycle
+
+```
+Mobile App                     Snora API                    Audio Engine
+    │                              │                              │
+    │  1. POST /sessions           │                              │
+    │  (agora token + bio state)   │                              │
+    │─────────────────────────────▶│                              │
+    │  { job_id, status: pending } │                              │
+    │◀─────────────────────────────│  spawn engine process        │
+    │                              │─────────────────────────────▶│
+    │                              │  init (token, channel, prefs)│
+    │                              │─────────────────────────────▶│
+    │                              │         ack + running        │
+    │                              │◀─────────────────────────────│
+    │                              │                              │
+    │  2. Join Agora channel       │                    ┌─────────┤
+    │  (RTC SDK subscriber)        │                    │ audio   │
+    │◀─────────────────────────────┼────────────────────┤ stream  │
+    │  🔊 ocean waves playing      │                    └─────────┤
+    │                              │                              │
+    │  3. PUT /sessions/:id/state  │                              │
+    │  (updated bio readings)      │  state_update via pub/sub    │
+    │─────────────────────────────▶│─────────────────────────────▶│
+    │                              │      audio adapts to mood    │
+    │                              │                              │
+    │  4. DELETE /sessions/:id     │                              │
+    │─────────────────────────────▶│  shutdown                    │
+    │                              │─────────────────────────────▶│
+    │  🔇 audio stops              │                              │
+```
+
+### Step 1: Create a Session
+
+Generate an Agora RTC token for your app, then create a session:
+
+```bash
+curl -X POST https://your-snora-host/sessions \
+  -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user-123",
+    "agora": {
+      "token": "007eJxT...",
+      "channel": "sleep-user-123"
+    },
+    "initial_state": {
+      "mood": "anxious",
+      "heart_rate": 82,
+      "hrv": 35,
+      "respiration_rate": 18,
+      "stress_level": 0.7
+    },
+    "preferences": {
+      "soundscape": "ocean",
+      "binaural_beats": true,
+      "volume": 0.7
+    }
+  }'
+```
+
+Response:
+```json
+{"job_id": "a1b2c3d4-...", "status": "pending"}
+```
+
+Available soundscapes: `ocean`, `rain`, `wind`
+
+### Step 2: Join the Agora Channel (Client Side)
+
+Use the Agora RTC SDK in your mobile/web app to subscribe to audio on the same channel:
+
+**Swift (iOS):**
+```swift
+let config = AgoraRtcEngineConfig()
+config.appId = "your-agora-app-id"
+let engine = AgoraRtcEngineKit.sharedEngine(with: config, delegate: self)
+
+engine.joinChannel(byToken: token, channelId: "sleep-user-123", uid: 0)
+// Audio from Snora engine will play automatically
+```
+
+**Kotlin (Android):**
+```kotlin
+val config = RtcEngineConfig()
+config.mAppId = "your-agora-app-id"
+val engine = RtcEngine.create(config)
+
+engine.joinChannel(token, "sleep-user-123", 0)
+// Audio from Snora engine will play through the device speaker
+```
+
+**Web (JavaScript):**
+```javascript
+import AgoraRTC from "agora-rtc-sdk-ng";
+
+const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+await client.join("your-agora-app-id", "sleep-user-123", token);
+client.on("user-published", async (user, mediaType) => {
+  if (mediaType === "audio") {
+    await client.subscribe(user, mediaType);
+    user.audioTrack.play();  // 🔊 ocean waves start playing
+  }
+});
+```
+
+### Step 3: Send Bio Data Updates
+
+As the user's wearable/sensors provide new readings, push them to Snora:
+
+```bash
+# Every 1-5 seconds, send the latest biometric readings
+curl -X PUT https://your-snora-host/sessions/a1b2c3d4-.../state \
+  -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mood": "calm",
+    "heart_rate": 65,
+    "hrv": 55,
+    "respiration_rate": 12,
+    "stress_level": 0.2
+  }'
+```
+
+The audio will smoothly adapt:
+- Stress 0.7 → 0.2: soundscape gets brighter, nature sounds quieter
+- Mood anxious → calm: binaural shifts from alpha (8-12 Hz) to delta (0.5-4 Hz)
+- Respiration 18 → 12: AM envelope slows to match breathing, guiding toward 5.5 bpm
+
+### Step 4: Renew Token (Before Expiry)
+
+Snora sends a `token_expiring` status when the Agora token is about to expire. Renew it:
+
+```bash
+curl -X PUT https://your-snora-host/sessions/a1b2c3d4-.../token \
+  -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "007eJxT...new-token..."}'
+```
+
+### Step 5: Stop the Session
+
+```bash
+curl -X DELETE https://your-snora-host/sessions/a1b2c3d4-... \
+  -H "X-API-Key: your-key"
+```
+
+### Check Session Status
+
+```bash
+curl https://your-snora-host/sessions/a1b2c3d4-... \
+  -H "X-API-Key: your-key"
+# => {"job_id": "...", "status": "running", "created_at": 1774172088905}
+```
+
+Possible statuses: `pending` → `starting` → `running` → `stopping` → `stopped`
 
 ## Environment Variables
 
@@ -73,52 +247,40 @@ docker compose up
 | `PORT` | no | `8080` | API server port |
 | `LOG_LEVEL` | no | `info` | pino log level |
 
-## API
+## API Reference
 
 All endpoints require `X-API-Key` header (except `/health` and `/metrics`).
 
-```
-POST   /sessions          Create a new sleep session
-GET    /sessions/:id      Get session status
-PUT    /sessions/:id/state   Update physiological state
-PUT    /sessions/:id/token   Renew Agora token
-DELETE /sessions/:id       Stop a session
-GET    /health             Health check (Redis, GPU, session count)
-GET    /metrics            Prometheus metrics
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/sessions` | Create a new sleep session |
+| `GET` | `/sessions/:id` | Get session status |
+| `PUT` | `/sessions/:id/state` | Update physiological state |
+| `PUT` | `/sessions/:id/token` | Renew Agora token |
+| `DELETE` | `/sessions/:id` | Stop a session |
+| `GET` | `/health` | Health check (Redis, active sessions) |
+| `GET` | `/metrics` | Prometheus metrics |
 
-### Create Session
+## Dev Testing
 
-```bash
-curl -X POST http://localhost:8080/sessions \
-  -H "X-API-Key: your-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "user-123",
-    "agora": { "token": "agora-token", "channel": "sleep-ch" },
-    "initial_state": {
-      "mood": "anxious",
-      "heart_rate": 82,
-      "hrv": 35,
-      "respiration_rate": 18,
-      "stress_level": 0.7
-    },
-    "preferences": {
-      "soundscape": "rain",
-      "binaural_beats": true,
-      "volume": 0.7
-    }
-  }'
-# => {"job_id": "uuid", "status": "pending"}
-```
-
-### Update State
+Test the engine locally with a real Agora channel:
 
 ```bash
-curl -X PUT http://localhost:8080/sessions/<job_id>/state \
-  -H "X-API-Key: your-key" \
-  -H "Content-Type: application/json" \
-  -d '{"mood": "calm", "heart_rate": 65, "hrv": 55, "respiration_rate": 12, "stress_level": 0.2}'
+# 1. Build the engine
+cd engine && cmake -B build -DSNORA_CPU_MODE=ON && cmake --build build
+
+# 2. Start the engine process
+LD_LIBRARY_PATH=third_party/agora_rtc_sdk/agora_sdk \
+  build/snora-engine --socket /tmp/snora-test.sock --gpu 0 &
+
+# 3. Generate an Agora token (using atem CLI)
+atem project use 1  # select your Agora project
+TOKEN=$(atem token rtc create --channel my-test --uid 0 | grep "^007")
+
+# 4. Connect and stream (sends init + periodic state updates)
+npx tsx scripts/stream-live.ts /tmp/snora-test.sock YOUR_APP_ID "$TOKEN" my-test
+
+# 5. Join "my-test" channel from any Agora RTC client to hear the audio
 ```
 
 ## Testing
@@ -127,8 +289,9 @@ curl -X PUT http://localhost:8080/sessions/<job_id>/state \
 # Node.js tests (59 tests, requires Redis)
 npm test
 
-# C++ engine tests (88 tests, including E2E)
-cd engine/build && ctest --output-on-failure
+# C++ engine tests (106 tests, including E2E)
+cd engine/build && LD_LIBRARY_PATH=../third_party/agora_rtc_sdk/agora_sdk \
+  ctest --output-on-failure
 
 # Lint
 npm run lint
@@ -151,19 +314,23 @@ engine/
   src/audio/    Noise gen, spectral tilt, AM, binaural, nature player, mixer, pipeline
   src/ipc/      Unix socket server, message framing
   src/state/    Session state, physio-to-audio parameter mapper
-  src/agora/    Agora SDK wrapper (stub + real)
-  tests/        88 GoogleTest tests (unit + integration + E2E)
-charts/snora/   Helm chart (deployment, HPA, network policy, PDB)
-docker/         Dockerfile (multi-stage CUDA + Node.js), entrypoint
+  src/agora/    Agora Server Gateway SDK 4.4.32 integration
+  tests/        106 GoogleTest tests (unit + integration + E2E + audio quality)
+scripts/
+  stream-live.ts   Dev test script — stream to Agora with live state updates
+  dev-test.ts      Quick smoke test — init, update, shutdown
+charts/snora/      Helm chart (deployment, HPA, network policy, PDB)
+docker/            Dockerfile (multi-stage build), Dockerfile.cuda (GPU), entrypoint
 ```
 
 ## Tech Stack
 
 - **Node.js 20**, TypeScript, Fastify, ioredis, pino, prom-client
-- **C++17**, CUDA 12.x, CMake, nlohmann/json, libsndfile, GoogleTest
-- **Agora Server Gateway SDK 4.x** for audio streaming
+- **C++17**, CMake, nlohmann/json, libsndfile, GoogleTest
+- **Agora Server Gateway SDK 4.4.32** for real-time audio streaming
 - **Redis 7** for job storage and pub/sub
-- **Docker** (nvidia/cuda base), **Helm**, **GitHub Actions** CI/CD
+- **Docker**, **Helm**, **GitHub Actions** CI/CD
+- Optional: **CUDA 12.x** for GPU-accelerated audio processing
 
 ## License
 

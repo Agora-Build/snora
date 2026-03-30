@@ -15,15 +15,12 @@ AudioPipeline::AudioPipeline()
 bool AudioPipeline::init(const SessionConfig &config) {
   soundscape_ = config.soundscape;
 
-  // Set initial smoother values to sensible defaults so there is no
-  // large ramp from 0 on the very first frame.
   slope_smoother_.setImmediate(-4.0f);
   am_smoother_.setImmediate(0.23f);
   binaural_smoother_.setImmediate(4.0f);
   nature_smoother_.setImmediate(0.4f);
   volume_smoother_.setImmediate(config.volume);
 
-  // Load nature sounds (non-fatal if assets unavailable)
   if (!config.assets_path.empty()) {
     nature_player_.load(config.assets_path, config.soundscape);
   }
@@ -33,7 +30,7 @@ bool AudioPipeline::init(const SessionConfig &config) {
 
 void AudioPipeline::processFrame(int16_t *output, const AudioParams &params) {
   // ------------------------------------------------------------------ //
-  // Step 1: update smoother targets
+  // Step 1: update and advance smoothers
   // ------------------------------------------------------------------ //
   slope_smoother_.setTarget(params.spectral_slope);
   am_smoother_.setTarget(params.am_frequency);
@@ -41,7 +38,6 @@ void AudioPipeline::processFrame(int16_t *output, const AudioParams &params) {
   nature_smoother_.setTarget(params.nature_gain);
   volume_smoother_.setTarget(params.master_volume);
 
-  // Step 2: advance smoothers to get values for this frame
   float slope = slope_smoother_.smooth();
   float am_freq = am_smoother_.smooth();
   float bin_hz = binaural_smoother_.smooth();
@@ -49,23 +45,13 @@ void AudioPipeline::processFrame(int16_t *output, const AudioParams &params) {
   float master_vol = volume_smoother_.smooth();
 
   // ------------------------------------------------------------------ //
-  // Step 3: generate noise buffer (very soft bed underneath textures)
+  // Step 2: generate noise bed (soft, colored by slope)
   // ------------------------------------------------------------------ //
   static int16_t noise_buf[FRAME_SAMPLES];
   noise_gen_.generate(noise_buf, slope, 0.15f);
 
   // ------------------------------------------------------------------ //
-  // Step 4: apply spectral tilt in-place
-  // ------------------------------------------------------------------ //
-  spectral_tilt_.process(noise_buf, FRAME_SAMPLES, slope);
-
-  // ------------------------------------------------------------------ //
-  // Step 5: apply amplitude modulation in-place
-  // ------------------------------------------------------------------ //
-  amplitude_mod_.process(noise_buf, FRAME_SAMPLES, am_freq);
-
-  // ------------------------------------------------------------------ //
-  // Step 6: generate binaural tones into a separate buffer and mix later
+  // Step 3: generate binaural tones
   // ------------------------------------------------------------------ //
   static int16_t binaural_buf[FRAME_SAMPLES];
   std::memset(binaural_buf, 0, sizeof(binaural_buf));
@@ -75,7 +61,7 @@ void AudioPipeline::processFrame(int16_t *output, const AudioParams &params) {
   }
 
   // ------------------------------------------------------------------ //
-  // Step 7: nature player (WAV loops from asset files)
+  // Step 4: nature player (WAV loops from asset files)
   // ------------------------------------------------------------------ //
   static int16_t nature_buf[FRAME_SAMPLES];
   std::memset(nature_buf, 0, sizeof(nature_buf));
@@ -84,7 +70,7 @@ void AudioPipeline::processFrame(int16_t *output, const AudioParams &params) {
   }
 
   // ------------------------------------------------------------------ //
-  // Step 8: procedural texture based on soundscape selection
+  // Step 5: procedural texture (rain/wind/ocean)
   // ------------------------------------------------------------------ //
   static int16_t proc_buf[FRAME_SAMPLES];
   std::memset(proc_buf, 0, sizeof(proc_buf));
@@ -98,16 +84,31 @@ void AudioPipeline::processFrame(int16_t *output, const AudioParams &params) {
   }
 
   // ------------------------------------------------------------------ //
-  // Step 9: mix all layers with Mixer, apply master volume
+  // Step 6: mix all layers
   // ------------------------------------------------------------------ //
   mixer_.mix(
       {
-          {noise_buf, 0.1f},
-          {binaural_buf, 0.1f},
+          {noise_buf, 0.15f},
+          {binaural_buf, 0.12f},
           {proc_buf, 0.8f},
           {nature_buf, 0.5f},
       },
       output, FRAME_SAMPLES, master_vol);
+
+  // ------------------------------------------------------------------ //
+  // Step 7: apply spectral tilt to the FULL mix
+  //   Bio data drives this: high stress = steeper slope = darker/warmer
+  //   low stress = flatter = brighter. Applied to entire output so the
+  //   ocean/rain/wind textures also shift with mood.
+  // ------------------------------------------------------------------ //
+  spectral_tilt_.process(output, FRAME_SAMPLES, slope);
+
+  // ------------------------------------------------------------------ //
+  // Step 8: apply amplitude modulation to the FULL mix
+  //   Respiration entrainment: the entire soundscape gently pulses at
+  //   the user's breathing rate, gradually slowing toward 5.5 bpm.
+  // ------------------------------------------------------------------ //
+  amplitude_mod_.process(output, FRAME_SAMPLES, am_freq);
 }
 
 } // namespace snora
