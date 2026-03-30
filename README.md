@@ -32,7 +32,7 @@ Each engine process runs a 10ms frame loop (48kHz stereo 16-bit). Layers are mix
 
 **Layers:**
 - **Procedural textures** — algorithmic ocean waves, rain, wind (dominant layer)
-- **Noise bed** — pink/brown noise colored by stress level (soft background)
+- **White/pink/brown noise** — Paul Kellett pinking filter blends white→pink→brown based on stress level; soft bed underneath the soundscape
 - **Binaural beats** — L/R frequency differential based on mood (subtle)
 - **Nature player** — WAV loops from asset files (optional)
 
