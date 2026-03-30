@@ -29,8 +29,8 @@ trap cleanup EXIT INT TERM
 if ! command -v atem >/dev/null 2>&1; then
   echo "Error: 'atem' CLI not found."
   echo ""
-  echo "Install atem:"
-  echo "  npm install -g @aspect/atem"
+  echo "Install atem (Agora CLI):"
+  echo "  npm install -g @agora-build/atem"
   echo ""
   echo "Then authenticate and select a project:"
   echo "  atem login"
