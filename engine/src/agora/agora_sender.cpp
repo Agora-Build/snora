@@ -208,8 +208,7 @@ bool AgoraSender::init(const std::string &app_id, const std::string &token,
   connection_->registerObserver(observer_.get());
 
   // 6. Connect to channel
-  int conn_result =
-      connection_->connect(token.c_str(), channel.c_str(), "0");
+  int conn_result = connection_->connect(token.c_str(), channel.c_str(), "0");
   if (conn_result) {
     fprintf(stderr,
             "{\"level\":\"error\",\"msg\":\"Failed to connect to Agora "
