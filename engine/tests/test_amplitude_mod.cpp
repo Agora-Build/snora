@@ -60,8 +60,8 @@ TEST(AmplitudeMod, EnvelopeVariesOverTime) {
     if (r > max_frame_rms) max_frame_rms = r;
   }
 
-  // There should be a significant range (envelope goes from 0 to 1)
-  EXPECT_GT(max_frame_rms, min_frame_rms * 5.0)
+  // Envelope depth maps [0,1] to [0.4,1.0], so max/min ratio ~2.5
+  EXPECT_GT(max_frame_rms, min_frame_rms * 1.5)
       << "max=" << max_frame_rms << " min=" << min_frame_rms;
 }
 
