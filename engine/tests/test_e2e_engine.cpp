@@ -137,6 +137,26 @@ class EngineE2ETest : public ::testing::Test {
     ADD_FAILURE() << "Timed out waiting for message type: " << type;
     return {};
   }
+
+  // Wait for status with specific reason (skips other status messages from SDK)
+  bool waitForRunningStatus(int timeout_ms = 15000) {
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+    while (std::chrono::steady_clock::now() < deadline) {
+      int remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+          deadline - std::chrono::steady_clock::now()).count();
+      auto msgs = receiveMessages(std::min(remaining, 500));
+      for (auto& m : msgs) {
+        if (m.type == "status" && m.data.contains("reason") &&
+            m.data["reason"] == "running") return true;
+      }
+    }
+    return false;
+  }
+
+  // Drain any pending messages (status noise from Agora SDK)
+  void drainMessages(int drain_ms = 200) {
+    receiveMessages(drain_ms);
+  }
 };
 
 TEST_F(EngineE2ETest, InitAckAndRunningStatus) {
@@ -162,10 +182,8 @@ TEST_F(EngineE2ETest, InitAckAndRunningStatus) {
   auto ack = waitForMessage("ack");
   EXPECT_EQ(ack.type, "ack");
 
-  // Should receive "running" status
-  auto status = waitForMessage("status");
-  EXPECT_EQ(status.type, "status");
-  EXPECT_EQ(status.data["reason"], "running");
+  // Should eventually receive "running" status (may get other Agora statuses first)
+  EXPECT_TRUE(waitForRunningStatus()) << "Engine should report running status";
 }
 
 TEST_F(EngineE2ETest, StateUpdateGetsAcked) {
@@ -183,7 +201,7 @@ TEST_F(EngineE2ETest, StateUpdateGetsAcked) {
   };
   sendMessage(init);
   waitForMessage("ack");
-  waitForMessage("status");
+  waitForRunningStatus();
 
   // Send state update
   snora::IpcMessage update;
@@ -216,7 +234,7 @@ TEST_F(EngineE2ETest, MultipleStateUpdatesAllAcked) {
   };
   sendMessage(init);
   waitForMessage("ack");
-  waitForMessage("status");
+  waitForRunningStatus();
 
   // Send 5 state updates in sequence
   for (int i = 0; i < 5; ++i) {
@@ -251,7 +269,7 @@ TEST_F(EngineE2ETest, ShutdownGracefully) {
   };
   sendMessage(init);
   waitForMessage("ack");
-  waitForMessage("status");
+  waitForRunningStatus();
 
   // Let it run for a bit (generate a few frames)
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -289,7 +307,7 @@ TEST_F(EngineE2ETest, TokenUpdateGetsAcked) {
   };
   sendMessage(init);
   waitForMessage("ack");
-  waitForMessage("status");
+  waitForRunningStatus();
 
   // Send token update
   snora::IpcMessage token_update;
@@ -321,7 +339,7 @@ TEST_F(EngineE2ETest, FullSessionLifecycle) {
   };
   sendMessage(init);
   EXPECT_EQ(waitForMessage("ack").type, "ack");
-  EXPECT_EQ(waitForMessage("status").data["reason"], "running");
+  EXPECT_TRUE(waitForRunningStatus());
 
   // 2. Simulate user going from anxious to calm over 3 updates
   std::vector<std::pair<std::string, float>> mood_progression = {

@@ -49,10 +49,10 @@ void AudioPipeline::processFrame(int16_t *output, const AudioParams &params) {
   float master_vol = volume_smoother_.smooth();
 
   // ------------------------------------------------------------------ //
-  // Step 3: generate noise buffer
+  // Step 3: generate noise buffer (very soft bed underneath textures)
   // ------------------------------------------------------------------ //
   static int16_t noise_buf[FRAME_SAMPLES];
-  noise_gen_.generate(noise_buf, slope, 0.7f);
+  noise_gen_.generate(noise_buf, slope, 0.15f);
 
   // ------------------------------------------------------------------ //
   // Step 4: apply spectral tilt in-place
@@ -90,11 +90,11 @@ void AudioPipeline::processFrame(int16_t *output, const AudioParams &params) {
   std::memset(proc_buf, 0, sizeof(proc_buf));
 
   if (soundscape_ == "rain") {
-    rain_.process(proc_buf, FRAME_SAMPLES, 0.6f);
+    rain_.process(proc_buf, FRAME_SAMPLES, 0.8f);
   } else if (soundscape_ == "wind") {
-    wind_.process(proc_buf, FRAME_SAMPLES, 0.6f);
+    wind_.process(proc_buf, FRAME_SAMPLES, 0.8f);
   } else if (soundscape_ == "ocean") {
-    ocean_.process(proc_buf, FRAME_SAMPLES, 0.6f);
+    ocean_.process(proc_buf, FRAME_SAMPLES, 0.8f);
   }
 
   // ------------------------------------------------------------------ //
@@ -102,9 +102,9 @@ void AudioPipeline::processFrame(int16_t *output, const AudioParams &params) {
   // ------------------------------------------------------------------ //
   mixer_.mix(
       {
-          {noise_buf, 0.6f},
-          {binaural_buf, 0.4f},
-          {proc_buf, 0.4f},
+          {noise_buf, 0.1f},
+          {binaural_buf, 0.1f},
+          {proc_buf, 0.8f},
           {nature_buf, 0.5f},
       },
       output, FRAME_SAMPLES, master_vol);

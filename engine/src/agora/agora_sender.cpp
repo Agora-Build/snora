@@ -145,12 +145,20 @@ bool AgoraSender::init(const std::string &app_id, const std::string &token,
   scfg.enableAudioDevice = false;
   scfg.enableVideo = false;
 
-  if (service_->initialize(scfg) != agora::ERR_OK) {
-    fprintf(stderr, "{\"level\":\"error\",\"msg\":\"Failed to initialize Agora "
-                    "service\"}\n");
+  int init_result = service_->initialize(scfg);
+  if (init_result != agora::ERR_OK) {
+    fprintf(stderr,
+            "{\"level\":\"error\",\"msg\":\"Failed to initialize Agora "
+            "service\",\"code\":%d}\n",
+            init_result);
     service_ = nullptr;
     return false;
   }
+
+  fprintf(stderr,
+          "{\"level\":\"info\",\"msg\":\"Agora service initialized\","
+          "\"app_id\":\"%s\"}\n",
+          app_id.c_str());
 
   // 2. Create media node factory and audio PCM sender
   auto factory = service_->createMediaNodeFactory();
@@ -200,9 +208,13 @@ bool AgoraSender::init(const std::string &app_id, const std::string &token,
   connection_->registerObserver(observer_.get());
 
   // 6. Connect to channel
-  if (connection_->connect(token.c_str(), channel.c_str(), "snora")) {
-    fprintf(stderr, "{\"level\":\"error\",\"msg\":\"Failed to connect to Agora "
-                    "channel\"}\n");
+  int conn_result =
+      connection_->connect(token.c_str(), channel.c_str(), "0");
+  if (conn_result) {
+    fprintf(stderr,
+            "{\"level\":\"error\",\"msg\":\"Failed to connect to Agora "
+            "channel\",\"code\":%d,\"channel\":\"%s\",\"token_len\":%zu}\n",
+            conn_result, channel.c_str(), token.size());
     leave();
     return false;
   }
