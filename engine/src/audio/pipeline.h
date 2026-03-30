@@ -28,6 +28,9 @@ public:
   // Generate one frame of audio into output buffer (FRAME_SAMPLES int16_t).
   void processFrame(int16_t *output, const AudioParams &params);
 
+  // Switch soundscape mid-session (smooth crossfade via mixer gains)
+  void setSoundscape(const std::string &soundscape) { soundscape_ = soundscape; }
+
 private:
   // Audio processors
   NoiseGenerator noise_gen_;

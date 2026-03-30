@@ -159,6 +159,12 @@ int main(int argc, char *argv[]) {
             msg.data.value("stress_level", physio.stress_level);
         state.updatePhysio(physio);
 
+        // Allow soundscape change mid-session
+        if (msg.data.contains("soundscape")) {
+          std::string new_sc = msg.data["soundscape"].get<std::string>();
+          pipeline.setSoundscape(new_sc);
+        }
+
         snora::IpcMessage a;
         a.type = "ack";
         ipc.send_message(a);

@@ -49,6 +49,7 @@ export const stateUpdateSchema = {
   additionalProperties: false,
   properties: {
     ...physiologicalStateProperties,
+    soundscape: { type: 'string', enum: ['ocean', 'rain', 'wind'] },
     timestamp: { type: 'integer' },
   },
 } as const;

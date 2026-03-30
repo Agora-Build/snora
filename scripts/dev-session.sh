@@ -156,12 +156,13 @@ echo ""
 
 # ── Cycle through bio phases via REST API ───────────────────────────────
 
+# Each phase: label|mood|stress|hr|hrv|resp|soundscape
 PHASES=(
-  "ANXIOUS|anxious|0.9|95|20|22"
-  "STRESSED|stressed|0.7|85|30|18"
-  "NEUTRAL|neutral|0.5|75|40|15"
-  "CALM|calm|0.2|62|55|10"
-  "SLEEPY|sleepy|0.05|55|65|7"
+  "ANXIOUS|anxious|0.9|95|20|22|rain"
+  "STRESSED|stressed|0.7|85|30|18|rain"
+  "NEUTRAL|neutral|0.5|75|40|15|wind"
+  "CALM|calm|0.2|62|55|10|ocean"
+  "SLEEPY|sleepy|0.05|55|65|7|ocean"
 )
 
 PHASE_DURATION=15
@@ -173,10 +174,10 @@ echo ""
 cycle=1
 while true; do
   for phase_data in "${PHASES[@]}"; do
-    IFS='|' read -r label mood stress hr hrv resp <<< "$phase_data"
+    IFS='|' read -r label mood stress hr hrv resp soundscape <<< "$phase_data"
 
     ts=$(date +%H:%M:%S)
-    echo "[$ts] Phase: $label (stress=$stress, mood=$mood, hr=$hr, resp=$resp)"
+    echo "[$ts] Phase: $label (mood=$mood stress=$stress soundscape=$soundscape)"
 
     curl -sf -X PUT "http://localhost:$API_PORT/sessions/$JOB_ID/state" \
       -H "X-API-Key: $API_KEY" \
@@ -186,7 +187,8 @@ while true; do
         \"heart_rate\": $hr,
         \"hrv\": $hrv,
         \"respiration_rate\": $resp,
-        \"stress_level\": $stress
+        \"stress_level\": $stress,
+        \"soundscape\": \"$soundscape\"
       }" >/dev/null 2>&1
 
     sleep $PHASE_DURATION
